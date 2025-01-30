@@ -1,0 +1,7 @@
+# SPDX-FileCopyrightText: none
+# SPDX-License-Identifier: 0BSD
+.cache/
+compile_commands.json
+src/.qmlls.ini
+src/sdk/target/
+src/sdk/Cargo.lock
