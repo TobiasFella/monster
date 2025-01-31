@@ -4,11 +4,7 @@
 #include "roomavatarimageprovider.h"
 
 #include "app.h"
-
-static rust::String stringToRust(const QString &string)
-{
-    return rust::String(string.toLatin1().data(), string.length());
-}
+#include "utils.h"
 
 QQuickImageResponse *RoomAvatarImageProvider::requestImageResponse(const QString &id, const QSize &requestedSize)
 {

@@ -5,6 +5,7 @@
 
 #include "lib.rs.h"
 #include "sdk/include/callbacks.h"
+#include "utils.h"
 
 class RoomsModel::Private
 {
@@ -29,12 +30,6 @@ QHash<int, QByteArray> RoomsModel::roleNames() const
         {RoomsModel::DisplayNameRole, "displayName"},
         {RoomsModel::AvatarUrlRole, "avatarUrl"},
     };
-}
-
-//TODO deduplicate
-static QString stringFromRust(rust::String string)
-{
-    return QString::fromLatin1({string.data(), (int) string.length()});
 }
 
 QVariant RoomsModel::data(const QModelIndex &index, int role) const

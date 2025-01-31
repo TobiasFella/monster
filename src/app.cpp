@@ -6,6 +6,7 @@
 #include <QDebug>
 
 #include "roomsmodel.h"
+#include "utils.h"
 
 class App::Private
 {
@@ -14,21 +15,6 @@ public:
 };
 
 App::~App() = default;
-
-static rust::String stringToRust(const char *string)
-{
-    return rust::String(string, strlen(string));
-}
-
-rust::String stringToRust(const QString &string)
-{
-    return rust::String(string.toUtf8().data(), string.length());
-}
-
-static QString stringFromRust(rust::String string)
-{
-    return QString::fromLatin1({string.data(), (int) string.length()});
-}
 
 App::App()
     : QObject(nullptr)

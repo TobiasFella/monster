@@ -6,6 +6,7 @@ add_executable(monster
     app.cpp
     roomsmodel.cpp
     roomavatarimageprovider.cpp
+    utils.cpp
 )
 
 ecm_add_qml_module(monster URI im.arctic.monster GENERATE_PLUGIN_SOURCE QML_FILES

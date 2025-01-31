@@ -5,8 +5,6 @@
 
 #include <QQuickAsyncImageProvider>
 
-#include "app.h"
-
 class RoomAvatarImageProvider : public QQuickAsyncImageProvider
 {
 public:
