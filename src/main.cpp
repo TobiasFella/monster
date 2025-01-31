@@ -8,6 +8,8 @@
 #include <QQmlContext>
 #include <QQmlApplicationEngine>
 
+#include "roomavatarimageprovider.h"
+
 int main(int argc, char *argv[])
 {
     KLocalizedString::setApplicationDomain("monster");
@@ -16,6 +18,7 @@ int main(int argc, char *argv[])
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextObject(new KLocalizedContext(&engine));
     engine.loadFromModule("im.arctic.monster", "Main");
+    engine.addImageProvider(QStringLiteral("roomavatar"), new RoomAvatarImageProvider);
 
     return app.exec();
 }

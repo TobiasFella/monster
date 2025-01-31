@@ -19,6 +19,7 @@ public:
     enum RoleNames {
         IdRole = Qt::DisplayRole,
         DisplayNameRole,
+        AvatarUrlRole,
     };
     Q_ENUM(RoleNames);
     static RoomsModel *create(QQmlEngine *engine, QJSEngine *)

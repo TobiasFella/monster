@@ -8,8 +8,7 @@ use std::sync::Arc;
 use tokio_stream::StreamExt;
 
 use matrix_sdk::{
-    Client,
-    ruma::UserId,
+    media::MediaFormat, ruma::{RoomId, UserId}, Client
 };
 
 
@@ -48,6 +47,17 @@ impl Connection {
             client,
             rooms: Arc::new(RwLock::new(vec!())),
         })
+    }
+
+    fn room_avatar(&self, room_id: String) {
+        let client = self.rt.block_on(async {
+            self.client.read().await.clone()
+        });
+        self.rt.spawn(async move {
+            let room_id = RoomId::parse(room_id).unwrap();
+            let data = client.get_room(&room_id).unwrap().avatar(MediaFormat::File).await.unwrap().unwrap();
+            ffi::shim_avatar_loaded(room_id.to_string(), data);
+        });
     }
 
     fn device_id(&self) -> String {
@@ -173,6 +183,7 @@ mod ffi {
         fn slide(self: &Connection);
         fn room(self: &Connection, index: usize) -> Box<RoomListRoom>;
         fn rooms_count(self: &Connection) -> usize;
+        fn room_avatar(self: &Connection, room_id: String);
 
         fn id(self: &RoomListRoom) -> String;
         fn display_name(self: &RoomListRoom) -> String;
@@ -183,5 +194,6 @@ mod ffi {
 
         fn shim_connected();
         fn shim_rooms_changed(op: u8, from: usize, to: usize);
+        fn shim_avatar_loaded(room_id: String, data: Vec<u8>);
     }
 }

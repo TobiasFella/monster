@@ -24,7 +24,9 @@ Kirigami.ScrollablePage {
             width: root.width
             required property string roomId
             required property string displayName
+            required property string avatarUrl
             text: roomDelegate.displayName
+            icon.source: roomDelegate.avatarUrl
         }
     }
 }

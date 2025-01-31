@@ -4,6 +4,7 @@
 #include "roomsmodel.h"
 
 #include "lib.rs.h"
+#include "sdk/include/callbacks.h"
 
 class RoomsModel::Private
 {
@@ -26,6 +27,7 @@ QHash<int, QByteArray> RoomsModel::roleNames() const
     return {
         {RoomsModel::IdRole, "roomId"},
         {RoomsModel::DisplayNameRole, "displayName"},
+        {RoomsModel::AvatarUrlRole, "avatarUrl"},
     };
 }
 
@@ -44,6 +46,8 @@ QVariant RoomsModel::data(const QModelIndex &index, int role) const
         return stringFromRust(d->app->connection()->room(row)->id()).toHtmlEscaped();
     } else if (role == DisplayNameRole) {
         return stringFromRust(d->app->connection()->room(row)->display_name()).toHtmlEscaped();
+    } else if (role == AvatarUrlRole) {
+        return QStringLiteral("image://roomavatar/%1").arg(stringFromRust(d->app->connection()->room(row)->id()));
     }
     return {};
 }

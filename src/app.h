@@ -36,6 +36,7 @@ public:
 Q_SIGNALS:
     void connected();
     void loggedInChanged();
+    void avatarLoaded(const QString &roomId, const QByteArray &data);
 
 private:
     App();

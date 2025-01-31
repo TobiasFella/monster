@@ -15,7 +15,7 @@ public:
 
 App::~App() = default;
 
-rust::String stringToRust(const char *string)
+static rust::String stringToRust(const char *string)
 {
     return rust::String(string, strlen(string));
 }
@@ -57,4 +57,10 @@ void App::login(const QString &matrixId, const QString &password)
 rust::Box<sdk::Connection> &App::connection() const
 {
     return *d->m_connection;
+}
+
+void shim_avatar_loaded(rust::String roomId, rust::Vec<std::uint8_t> _data)
+{
+    QByteArray data((const char *) _data.data(), _data.size());
+    Q_EMIT App::instance().avatarLoaded(stringFromRust(roomId), data);
 }
