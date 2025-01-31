@@ -13,4 +13,5 @@ class RoomListRoom;
 
 void shim_connected();
 void shim_rooms_changed(std::uint8_t op, std::size_t index, std::size_t length);
+void shim_timeline_changed(std::uint8_t op, std::size_t index, std::size_t length);
 void shim_avatar_loaded(rust::String roomId, rust::Vec<std::uint8_t> data);

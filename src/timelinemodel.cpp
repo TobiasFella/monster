@@ -1,73 +1,81 @@
 // SPDX-FileCopyrightText: 2025 Tobias Fella <tobias.fella@kde.org>
 // SPDX-License-Identifier: LGPL-2.0-or-later
 
-#include "roomsmodel.h"
+#include "timelinemodel.h"
 
 #include "lib.rs.h"
 #include "sdk/include/callbacks.h"
 #include "utils.h"
+#include "app.h"
 
-class RoomsModel::Private
+class TimelineModel::Private
 {
 public:
-    App *app = nullptr;
-    RoomsModel *q = nullptr;
+    TimelineModel *q = nullptr;
+    QString m_roomId;
 };
 
-RoomsModel::~RoomsModel() = default;
+TimelineModel::~TimelineModel() = default;
 
-RoomsModel::RoomsModel()
-    : QAbstractListModel(nullptr)
-    , d(std::make_unique<Private>())
+TimelineModel::TimelineModel(QObject *parent)
+: QAbstractListModel(parent)
+, d(std::make_unique<Private>())
 {
     d->q = this;
+    connect(this, &TimelineModel::roomIdChanged, this, [this](){
+        App::instance().connection()->timeline(stringToRust(roomId()));
+    });
 }
 
-QHash<int, QByteArray> RoomsModel::roleNames() const
+QString TimelineModel::roomId() const
+{
+    return d->m_roomId;
+}
+
+void TimelineModel::setRoomId(const QString &roomId)
+{
+    if (roomId == d->m_roomId) {
+        return;
+    }
+    d->m_roomId = roomId;
+    Q_EMIT roomIdChanged();
+}
+
+QHash<int, QByteArray> TimelineModel::roleNames() const
 {
     return {
-        {RoomsModel::IdRole, "roomId"},
-        {RoomsModel::DisplayNameRole, "displayName"},
-        {RoomsModel::AvatarUrlRole, "avatarUrl"},
+        {TimelineModel::IdRole, "eventId"},
     };
 }
 
-QVariant RoomsModel::data(const QModelIndex &index, int role) const
+QVariant TimelineModel::data(const QModelIndex &index, int role) const
 {
     Q_UNUSED(role);
     const auto row = index.row();
-    if (row >= d->app->connection()->rooms_count()) {
-        //TODO why
-        return {};
-    }
 
     if (role == IdRole) {
-        return stringFromRust(d->app->connection()->room(row)->id()).toHtmlEscaped();
-    } else if (role == DisplayNameRole) {
-        return stringFromRust(d->app->connection()->room(row)->display_name()).toHtmlEscaped();
-    } else if (role == AvatarUrlRole) {
-        return QStringLiteral("image://roomavatar/%1").arg(stringFromRust(d->app->connection()->room(row)->id()));
+        return stringFromRust(App::instance().connection()->timeline_item(row)->id()).toHtmlEscaped();
     }
     return {};
 }
 
-int RoomsModel::rowCount(const QModelIndex &parent) const
+int TimelineModel::rowCount(const QModelIndex &parent) const
 {
     if (parent.isValid()) {
         return {};
     }
-    return d->app->connection()->rooms_count();
+    return App::instance().connection()->room_event_count(stringToRust(roomId()));
 }
 
-void shim_rooms_changed(std::uint8_t op, std::size_t from, std::size_t to)
+void shim_timeline_changed(std::uint8_t op, std::size_t from, std::size_t to)
 {
-    RoomsModel::instance().roomsUpdate(op, from, to);
+    TimelineModel::instance().timelineUpdate(op, from, to);
 }
 
-void RoomsModel::roomsUpdate(std::uint8_t op, std::size_t from, std::size_t to)
+//TODO only react to changes to *this* room
+void TimelineModel::timelineUpdate(std::uint8_t op, std::size_t from, std::size_t to)
 {
     QMetaObject::invokeMethod(this, [this, op, from, to](){
-
         switch (op) {
             case 0: {
                 beginResetModel();
@@ -125,9 +133,4 @@ void RoomsModel::roomsUpdate(std::uint8_t op, std::size_t from, std::size_t to)
             }
         }
     }, Qt::QueuedConnection);
-}
-
-void RoomsModel::setApp(App *app)
-{
-    d->app = app;
 }

@@ -16,9 +16,17 @@ struct Connection {
     rt: Runtime,
     client: Arc<RwLock<Client>>,
     rooms: Arc<RwLock<Vec<matrix_sdk_ui::room_list_service::Room>>>,
+    timeline_events: Arc<RwLock<Vec<Arc<matrix_sdk_ui::timeline::TimelineItem>>>>,
 }
 
 struct RoomListRoom(matrix_sdk_ui::room_list_service::Room);
+struct TimelineItem(Arc<matrix_sdk_ui::timeline::TimelineItem>);
+
+impl TimelineItem {
+    fn id(&self) -> String {
+        self.0.as_event().map(|event| event.event_id().map(|id| id.to_string()).unwrap_or("no_id".to_string())).unwrap_or("no id".to_string())
+    }
+}
 
 impl RoomListRoom {
     fn id(&self) -> String {
@@ -46,7 +54,96 @@ impl Connection {
             rt,
             client,
             rooms: Arc::new(RwLock::new(vec!())),
+            timeline_events: Arc::new(RwLock::new(vec!())),
         })
+    }
+
+    fn timeline(&self, room_id: String) {
+        let (client, timeline_events) = self.rt.block_on(async {
+            (self.client.read().await.clone(), self.timeline_events.clone())
+        });
+        self.rt.spawn(async move {
+            let room_id = RoomId::parse(room_id).unwrap();
+            let room = client.get_room(&room_id).unwrap();
+            let builder = matrix_sdk_ui::timeline::Timeline::builder(&room);
+            let timeline = builder.build().await.unwrap();
+            let (_items, stream) = timeline.subscribe().await;
+
+            tokio::pin!(stream);
+            loop {
+                let Some(entry) = stream.next().await else {
+                    continue; //TODO or return?
+                };
+                use matrix_sdk_ui::eyeball_im::VectorDiff;
+                match entry {
+                    VectorDiff::Append { values } => {
+                        let from = timeline_events.read().await.len();
+                        let to = from + values.len() - 1;
+                        {
+                            let mut guard = timeline_events.write().await;
+                            for item in values {
+                                guard.push(item);
+                            }
+                        }
+                        ffi::shim_timeline_changed(0, from, to);
+                    }
+                    VectorDiff::Clear => {
+                        let mut guard = timeline_events.write().await;
+                        let to = guard.len();
+                        guard.clear();
+                        ffi::shim_timeline_changed(1, 0, to);
+                    }
+                    VectorDiff::PushFront { value } => {
+                        timeline_events.write().await.insert(0, value);
+                        ffi::shim_timeline_changed(2, 0, 0);
+                    }
+                    VectorDiff::PushBack { value } => {
+                        let mut guard = timeline_events.write().await;
+                        let from = guard.len();
+                        guard.push(value);
+                        ffi::shim_timeline_changed(3, from, from);
+                    }
+                    VectorDiff::PopFront => {
+                        timeline_events.write().await.remove(0);
+                        ffi::shim_timeline_changed(4, 0, 0);
+                    }
+                    VectorDiff::PopBack => {
+                        let mut guard = timeline_events.write().await;
+                        let from = guard.len() - 1;
+                        guard.pop();
+                        ffi::shim_timeline_changed(5, from, from);
+                    }
+                    VectorDiff::Insert { index, value } => {
+                        timeline_events.write().await.insert(index, value);
+                        ffi::shim_timeline_changed(6, index, index);
+                    }
+                    VectorDiff::Set { index, value } => {
+                        timeline_events.write().await[index] = value;
+                        ffi::shim_timeline_changed(7, index, index);
+                    }
+                    VectorDiff::Remove { index } => {
+                        timeline_events.write().await.remove(index);
+                        ffi::shim_timeline_changed(8, index, index);
+                    }
+                    VectorDiff::Truncate { length } => {
+                        let mut guard = timeline_events.write().await;
+                        let to = guard.len();
+                        guard.truncate(length);
+                        ffi::shim_timeline_changed(9, length, to - 1);
+                    }
+                    VectorDiff::Reset { values } => {
+                        timeline_events.write().await.clear();
+                        {
+                            let mut guard = timeline_events.write().await;
+                            for item in values {
+                                guard.push(item);
+                            }
+                        }
+                        ffi::shim_timeline_changed(10, 0, 0);
+                    }
+                };
+            }
+        });
     }
 
     fn room_avatar(&self, room_id: String) {
@@ -60,6 +157,12 @@ impl Connection {
         });
     }
 
+    fn timeline_item(&self, index: usize) -> Box<TimelineItem> {
+        self.rt.block_on(async {
+            Box::new(TimelineItem(self.timeline_events.read().await[index].clone()))
+        })
+    }
+
     fn device_id(&self) -> String {
         self.rt.block_on(async {
             self.client.read().await.device_id().unwrap().to_string()
@@ -69,6 +172,12 @@ impl Connection {
     fn room(&self, index: usize) -> Box<RoomListRoom> {
         self.rt.block_on(async {
             Box::new(RoomListRoom(self.rooms.read().await[index].clone()))
+        })
+    }
+
+    fn room_event_count(&self, _room_id: String) -> usize {
+        self.rt.block_on(async {
+            self.timeline_events.read().await.len()
         })
     }
 
@@ -160,7 +269,6 @@ impl Connection {
                             }
                             ffi::shim_rooms_changed(10, 0, 0);
                         }
-
                     };
                 }
             }
@@ -178,15 +286,21 @@ mod ffi {
     extern "Rust" {
         type Connection;
         type RoomListRoom;
+        type TimelineItem;
         fn init(matrix_id: String, password: String) -> Box<Connection>;
         fn device_id(self: &Connection) -> String;
         fn slide(self: &Connection);
         fn room(self: &Connection, index: usize) -> Box<RoomListRoom>;
         fn rooms_count(self: &Connection) -> usize;
         fn room_avatar(self: &Connection, room_id: String);
+        fn timeline(self: &Connection, room_id: String);
+        fn room_event_count(self: &Connection, room_id: String) -> usize;
+        fn timeline_item(self: &Connection, index: usize) -> Box<TimelineItem>;
 
         fn id(self: &RoomListRoom) -> String;
         fn display_name(self: &RoomListRoom) -> String;
+
+        fn id(self: &TimelineItem) -> String;
     }
 
     unsafe extern "C++" {
@@ -194,6 +308,7 @@ mod ffi {
 
         fn shim_connected();
         fn shim_rooms_changed(op: u8, from: usize, to: usize);
+        fn shim_timeline_changed(op: u8, from: usize, to: usize);
         fn shim_avatar_loaded(room_id: String, data: Vec<u8>);
     }
 }

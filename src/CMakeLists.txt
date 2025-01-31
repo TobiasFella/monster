@@ -7,11 +7,13 @@ add_executable(monster
     roomsmodel.cpp
     roomavatarimageprovider.cpp
     utils.cpp
+    timelinemodel.cpp
 )
 
 ecm_add_qml_module(monster URI im.arctic.monster GENERATE_PLUGIN_SOURCE QML_FILES
     qml/Main.qml
     qml/RoomListPage.qml
+    qml/RoomPage.qml
 )
 
 target_link_libraries(monster PRIVATE sdk Qt::Core Qt::Gui Qt::Qml Qt::Quick KF6::I18n)
