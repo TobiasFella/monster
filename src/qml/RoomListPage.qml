@@ -17,8 +17,12 @@ Kirigami.ScrollablePage {
 
     title: i18nc("@title", "Login")
 
+    required property Connection connection
+
     ListView {
-        model: RoomsModel
+        model: RoomsModel {
+            connection: root.connection
+        }
         delegate: QQC2.ItemDelegate {
             id: roomDelegate
             width: root.width
@@ -28,7 +32,8 @@ Kirigami.ScrollablePage {
             text: roomDelegate.displayName
             icon.source: roomDelegate.avatarUrl
             onClicked: pageStack.push(Qt.createComponent("im.arctic.monster", "RoomPage"), {
-                roomId: roomDelegate.roomId
+                roomId: roomDelegate.roomId,
+                connection: root.connection,
             })
         }
     }

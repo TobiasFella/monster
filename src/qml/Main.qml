@@ -20,11 +20,16 @@ Kirigami.ApplicationWindow {
 
     title: i18nc("@title:window", "Monster")
 
-    Connections {
-        target: App
-        function onLoggedInChanged(): void {
+    Connection {
+        id: connection
+        Component.onCompleted: {
+            RoomAvatarImageProvider.connection = connection;
+        }
+        onLoggedInChanged: {
             root.pageStack.pop();
-            root.pageStack.push(Qt.createComponent("im.arctic.monster", "RoomListPage"))
+            root.pageStack.push(Qt.createComponent("im.arctic.monster", "RoomListPage"), {
+                connection: connection
+            }, {});
         }
     }
 
@@ -45,11 +50,7 @@ Kirigami.ApplicationWindow {
             }
             FormCard.FormButtonDelegate {
                 text: i18nc("@action:button", "Login")
-                onClicked: App.login(matrixIdField.text, passwordField.text)
-            }
-            FormCard.FormTextDelegate {
-                text: i18nc("@info", "Logged in")
-                visible: App.loggedIn
+                onClicked: connection.login(matrixIdField.text, passwordField.text)
             }
         }
     }

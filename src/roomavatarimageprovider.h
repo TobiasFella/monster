@@ -5,17 +5,44 @@
 
 #include <QQuickAsyncImageProvider>
 
+#include "connection.h"
+
 class RoomAvatarImageProvider : public QQuickAsyncImageProvider
 {
+    Q_OBJECT
+    QML_ELEMENT
+    QML_SINGLETON
+
+    Q_PROPERTY(Connection *connection READ connection WRITE setConnection NOTIFY connectionChanged)
 public:
     QQuickImageResponse *requestImageResponse(const QString &id, const QSize &requestedSize) override;
+
+    static RoomAvatarImageProvider &instance() {
+        static RoomAvatarImageProvider _instance;
+        return _instance;
+    }
+
+    static RoomAvatarImageProvider *create(QQmlEngine *, QJSEngine *) {
+        QQmlEngine::setObjectOwnership(&instance(), QQmlEngine::CppOwnership);
+        return &instance();
+    }
+
+    Connection *connection() const;
+    void setConnection(Connection *connection);
+
+Q_SIGNALS:
+    void connectionChanged();
+
+private:
+    RoomAvatarImageProvider();
+    QPointer<Connection> m_connection;
 };
 
 class RoomAvatarImageResponse : public QQuickImageResponse
 {
     Q_OBJECT
 public:
-    RoomAvatarImageResponse(const QString &id, const QSize &requestedSize);
+    RoomAvatarImageResponse(const QString &id, const QSize &requestedSize, Connection *connection);
     QQuickTextureFactory *textureFactory() const override;
 private:
     QImage m_image;

@@ -25,7 +25,7 @@ include(KDECompilerSettings NO_POLICY_SCOPE)
 include(KDEGitCommitHooks)
 include(ECMQmlModule)
 
-find_package(Qt6 ${QT_MIN_VERSION} REQUIRED NO_MODULE COMPONENTS Core Quick Gui QuickControls2 Svg)
+find_package(Qt6 ${QT_MIN_VERSION} REQUIRED NO_MODULE COMPONENTS Core Quick Gui QuickControls2 Svg Widgets)
 find_package(KF6 ${KF_MIN_VERSION} REQUIRED COMPONENTS I18n)
 find_package(Corrosion REQUIRED)
 

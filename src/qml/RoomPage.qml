@@ -13,16 +13,21 @@ import im.arctic.monster
 Kirigami.ScrollablePage {
     id: root
 
-    property string roomId
+    required property string roomId
+    required property Connection connection
 
-    Component.onCompleted: TimelineModel.roomId = root.roomId
     title: i18nc("@title", "Room")
 
     ListView {
-        model: TimelineModel
+        anchors.fill: parent
+        model: TimelineModel {
+            connection: root.connection
+            roomId: root.roomId
+        }
         delegate: QQC2.ItemDelegate {
-            width: root.width
             required property string eventId
+
+            width: root.width
             text: eventId
         }
     }

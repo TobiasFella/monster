@@ -9,37 +9,27 @@
 
 #include "lib.rs.h"
 
-class App : public QObject
+class Connection : public QObject
 {
     Q_OBJECT
     QML_ELEMENT
-    QML_SINGLETON
 
     Q_PROPERTY(bool loggedIn MEMBER m_loggedIn NOTIFY loggedInChanged)
 
 public:
-    static App *create(QQmlEngine *engine, QJSEngine *)
-    {
-        engine->setObjectOwnership(&instance(), QQmlEngine::CppOwnership);
-        return &instance();
-    }
-    static App &instance() {
-        static App _instance;
-        return _instance;
-    };
-    ~App();
+    Connection(QObject *parent = nullptr);
+    ~Connection();
 
     Q_INVOKABLE void login(const QString &matrixId, const QString &password);
 
     rust::Box<sdk::Connection> &connection() const;
+    QString matrixId() const;
 
 Q_SIGNALS:
-    void connected();
     void loggedInChanged();
     void avatarLoaded(const QString &roomId, const QByteArray &data);
 
 private:
-    App();
     bool m_loggedIn = false;
     class Private;
     std::unique_ptr<Private> d;

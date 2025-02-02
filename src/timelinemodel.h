@@ -7,28 +7,22 @@
 #include <qqmlintegration.h>
 #include <QQmlEngine>
 
+class Connection;
+
 class TimelineModel : public QAbstractListModel
 {
     Q_OBJECT
     QML_ELEMENT
-    QML_SINGLETON
     Q_PROPERTY(QString roomId READ roomId WRITE setRoomId NOTIFY roomIdChanged)
+    Q_PROPERTY(Connection *connection READ connection WRITE setConnection NOTIFY connectionChanged)
 
 public:
     enum RoleNames {
         IdRole = Qt::DisplayRole,
     };
     Q_ENUM(RoleNames);
-    static TimelineModel *create(QQmlEngine *engine, QJSEngine *)
-    {
-        engine->setObjectOwnership(&instance(), QQmlEngine::CppOwnership);
-        return &instance();
-    }
-    static TimelineModel &instance() {
-        static TimelineModel _instance;
-        return _instance;
-    };
 
+    TimelineModel(QObject *parent = nullptr);
     ~TimelineModel();
 
     QHash<int, QByteArray> roleNames() const override;
@@ -38,13 +32,16 @@ public:
     QString roomId() const;
     void setRoomId(const QString &roomId);
 
+    Connection *connection() const;
+    void setConnection(Connection *connection);
+
     void timelineUpdate(std::uint8_t op, std::size_t from, std::size_t to);
 
 Q_SIGNALS:
     void roomIdChanged();
+    void connectionChanged();
 
 private:
-    TimelineModel(QObject *parent = nullptr);
     class Private;
     std::unique_ptr<Private> d;
 };

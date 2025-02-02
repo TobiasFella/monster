@@ -6,21 +6,32 @@
 #include "lib.rs.h"
 #include "sdk/include/callbacks.h"
 #include "utils.h"
+#include "connection.h"
+#include "dispatcher.h"
+
+#include <QPointer>
 
 class RoomsModel::Private
 {
 public:
-    App *app = nullptr;
-    RoomsModel *q = nullptr;
+    QPointer<Connection> connection;
 };
 
 RoomsModel::~RoomsModel() = default;
 
-RoomsModel::RoomsModel()
-    : QAbstractListModel(nullptr)
+RoomsModel::RoomsModel(QObject *parent)
+    : QAbstractListModel(parent)
     , d(std::make_unique<Private>())
 {
-    d->q = this;
+    connect(this, &RoomsModel::connectionChanged, this, [this]() {
+        d->connection->connection()->slide();
+    });
+    connect(Dispatcher::instance(), &Dispatcher::roomsUpdate, this, [this](const auto &matrixId, const auto op, const auto from, const auto to) {
+        if (matrixId != d->connection->matrixId()) {
+            return;
+        }
+        roomsUpdate(op, from, to);
+    });
 }
 
 QHash<int, QByteArray> RoomsModel::roleNames() const
@@ -36,17 +47,17 @@ QVariant RoomsModel::data(const QModelIndex &index, int role) const
 {
     Q_UNUSED(role);
     const auto row = index.row();
-    if (row >= d->app->connection()->rooms_count()) {
+    if (row >= (int) d->connection->connection()->rooms_count()) {
         //TODO why
         return {};
     }
 
     if (role == IdRole) {
-        return stringFromRust(d->app->connection()->room(row)->id()).toHtmlEscaped();
+        return stringFromRust(d->connection->connection()->room(row)->id()).toHtmlEscaped();
     } else if (role == DisplayNameRole) {
-        return stringFromRust(d->app->connection()->room(row)->display_name()).toHtmlEscaped();
+        return stringFromRust(d->connection->connection()->room(row)->display_name()).toHtmlEscaped();
     } else if (role == AvatarUrlRole) {
-        return QStringLiteral("image://roomavatar/%1").arg(stringFromRust(d->app->connection()->room(row)->id()));
+        return QStringLiteral("image://roomavatar/%1").arg(stringFromRust(d->connection->connection()->room(row)->id()));
     }
     return {};
 }
@@ -56,12 +67,7 @@ int RoomsModel::rowCount(const QModelIndex &parent) const
     if (parent.isValid()) {
         return {};
     }
-    return d->app->connection()->rooms_count();
-}
-
-void shim_rooms_changed(std::uint8_t op, std::size_t from, std::size_t to)
-{
-    RoomsModel::instance().roomsUpdate(op, from, to);
+    return d->connection->connection()->rooms_count();
 }
 
 void RoomsModel::roomsUpdate(std::uint8_t op, std::size_t from, std::size_t to)
@@ -127,7 +133,16 @@ void RoomsModel::roomsUpdate(std::uint8_t op, std::size_t from, std::size_t to)
     }, Qt::QueuedConnection);
 }
 
-void RoomsModel::setApp(App *app)
+Connection *RoomsModel::connection() const
 {
-    d->app = app;
+    return d->connection;
+}
+
+void RoomsModel::setConnection(Connection *connection)
+{
+    if (d->connection == connection) {
+        return;
+    }
+    d->connection = connection;
+    Q_EMIT connectionChanged();
 }

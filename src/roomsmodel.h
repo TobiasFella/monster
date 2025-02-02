@@ -7,13 +7,13 @@
 #include <qqmlintegration.h>
 #include <QQmlEngine>
 
-#include "app.h"
+class Connection;
 
 class RoomsModel : public QAbstractListModel
 {
     Q_OBJECT
     QML_ELEMENT
-    QML_SINGLETON
+    Q_PROPERTY(Connection *connection READ connection WRITE setConnection NOTIFY connectionChanged)
 
 public:
     enum RoleNames {
@@ -22,19 +22,12 @@ public:
         AvatarUrlRole,
     };
     Q_ENUM(RoleNames);
-    static RoomsModel *create(QQmlEngine *engine, QJSEngine *)
-    {
-        engine->setObjectOwnership(&instance(), QQmlEngine::CppOwnership);
-        return &instance();
-    }
-    static RoomsModel &instance() {
-        static RoomsModel _instance;
-        return _instance;
-    };
 
-    void setApp(App *app);
-
+    RoomsModel(QObject *parent = nullptr);
     ~RoomsModel();
+
+    void setConnection(Connection *connection);
+    Connection *connection() const;
 
     QHash<int, QByteArray> roleNames() const override;
     QVariant data(const QModelIndex &index, int role) const override;
@@ -42,8 +35,10 @@ public:
 
     void roomsUpdate(std::uint8_t op, std::size_t from, std::size_t to);
 
+Q_SIGNALS:
+    void connectionChanged();
+
 private:
-    RoomsModel();
     class Private;
     std::unique_ptr<Private> d;
 };

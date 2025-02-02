@@ -3,15 +3,16 @@
 
 #include "timelinemodel.h"
 
+#include "dispatcher.h"
 #include "lib.rs.h"
-#include "sdk/include/callbacks.h"
 #include "utils.h"
-#include "app.h"
+
+#include "connection.h"
 
 class TimelineModel::Private
 {
 public:
-    TimelineModel *q = nullptr;
+    QPointer<Connection> connection;
     QString m_roomId;
 };
 
@@ -21,10 +22,37 @@ TimelineModel::TimelineModel(QObject *parent)
 : QAbstractListModel(parent)
 , d(std::make_unique<Private>())
 {
-    d->q = this;
-    connect(this, &TimelineModel::roomIdChanged, this, [this](){
-        App::instance().connection()->timeline(stringToRust(roomId()));
+    connect(this, &TimelineModel::roomIdChanged, this, [this]() {
+        if (d->connection) {
+            d->connection->connection()->timeline(stringToRust(roomId()));
+        }
     });
+
+    connect(this, &TimelineModel::connectionChanged, this, [this]() {
+        if (!d->m_roomId.isEmpty()) {
+            d->connection->connection()->timeline(stringToRust(roomId()));
+        }
+    });
+    connect(Dispatcher::instance(), &Dispatcher::timelineUpdate, this, [this](const auto &matrixId, const auto &roomId, const auto op, const auto from, const auto to) {
+        if (matrixId != d->connection->matrixId() || roomId != d->m_roomId) {
+            return;
+        }
+        timelineUpdate(op, from, to);
+    });
+}
+
+Connection *TimelineModel::connection() const
+{
+    return d->connection;
+}
+
+void TimelineModel::setConnection(Connection *connection)
+{
+    if (connection == d->connection) {
+        return;
+    }
+    d->connection = connection;
+    Q_EMIT connectionChanged();
 }
 
 QString TimelineModel::roomId() const
@@ -54,7 +82,7 @@ QVariant TimelineModel::data(const QModelIndex &index, int role) const
     const auto row = index.row();
 
     if (role == IdRole) {
-        return stringFromRust(App::instance().connection()->timeline_item(row)->id()).toHtmlEscaped();
+        return stringFromRust(d->connection->connection()->timeline_item(row)->id()).toHtmlEscaped();
     }
     return {};
 }
@@ -64,15 +92,9 @@ int TimelineModel::rowCount(const QModelIndex &parent) const
     if (parent.isValid()) {
         return {};
     }
-    return App::instance().connection()->room_event_count(stringToRust(roomId()));
+    return d->connection->connection()->room_event_count(stringToRust(roomId()));
 }
 
-void shim_timeline_changed(std::uint8_t op, std::size_t from, std::size_t to)
-{
-    TimelineModel::instance().timelineUpdate(op, from, to);
-}
-
-//TODO only react to changes to *this* room
 void TimelineModel::timelineUpdate(std::uint8_t op, std::size_t from, std::size_t to)
 {
     QMetaObject::invokeMethod(this, [this, op, from, to](){
