@@ -88,11 +88,16 @@ impl Connection {
             let (items, stream) = matrix_sdk_ui::timeline::Timeline::builder(&room).build().await.unwrap().subscribe().await;
             tokio::pin!(stream);
 
+            let mxid = matrix_id.clone();
+
             {
+                let len = items.len();
                 let mut write = timeline.write().unwrap();
                 for item in items {
                     write.push(item);
                 }
+
+                ffi::shim_timeline_changed(mxid, room_id.to_string(), 2, 0, len - 1);
             }
 
             loop {

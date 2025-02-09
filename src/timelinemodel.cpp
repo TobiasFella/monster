@@ -101,7 +101,7 @@ void TimelineModel::timelineUpdate(std::uint8_t op, std::size_t from, std::size_
     QMetaObject::invokeMethod(this, [this, op, from, to](){
         switch (op) {
             case 0: {
-                beginResetModel();
+                beginInsertRows({}, from, to);
                 endInsertRows();
                 break;
             }
