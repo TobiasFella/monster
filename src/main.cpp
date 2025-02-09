@@ -26,7 +26,7 @@ int main(int argc, char *argv[])
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextObject(new KLocalizedContext(&engine));
     engine.loadFromModule("im.arctic.monster", "Main");
-    engine.addImageProvider(QStringLiteral("roomavatar"), &RoomAvatarImageProvider::instance());
+    engine.addImageProvider(QStringLiteral("roomavatar"), RoomAvatarImageProvider::instance());
 
     return app.exec();
 }

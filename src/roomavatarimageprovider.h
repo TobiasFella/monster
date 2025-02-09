@@ -17,14 +17,14 @@ class RoomAvatarImageProvider : public QQuickAsyncImageProvider
 public:
     QQuickImageResponse *requestImageResponse(const QString &id, const QSize &requestedSize) override;
 
-    static RoomAvatarImageProvider &instance() {
-        static RoomAvatarImageProvider _instance;
+    static RoomAvatarImageProvider *instance() {
+        static RoomAvatarImageProvider *_instance = new RoomAvatarImageProvider;
         return _instance;
     }
 
     static RoomAvatarImageProvider *create(QQmlEngine *, QJSEngine *) {
-        QQmlEngine::setObjectOwnership(&instance(), QQmlEngine::CppOwnership);
-        return &instance();
+        QQmlEngine::setObjectOwnership(instance(), QQmlEngine::CppOwnership);
+        return instance();
     }
 
     Connection *connection() const;
