@@ -155,7 +155,7 @@ impl Connection {
         });
         self.rt.spawn(async move {
             let room_id = RoomId::parse(room_id).unwrap();
-            let data = client.get_room(&room_id).unwrap().avatar(MediaFormat::File).await.unwrap().unwrap();
+            let data = client.get_room(&room_id).unwrap().avatar(MediaFormat::File).await.unwrap().unwrap_or("".into());
             ffi::shim_avatar_loaded(room_id.to_string(), data);
         });
     }
