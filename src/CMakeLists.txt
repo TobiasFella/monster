@@ -11,10 +11,13 @@ add_executable(monster
     dispatcher.cpp
 )
 
-ecm_add_qml_module(monster URI im.arctic.monster GENERATE_PLUGIN_SOURCE QML_FILES
-    qml/Main.qml
-    qml/RoomListPage.qml
-    qml/RoomPage.qml
+ecm_add_qml_module(monster URI im.arctic.monster GENERATE_PLUGIN_SOURCE
+    QML_FILES
+        qml/Main.qml
+        qml/RoomListPage.qml
+        qml/RoomPage.qml
+    DEPENDENCIES
+        QtCore
 )
 
 target_link_libraries(monster PRIVATE sdk Qt::Core Qt::Gui Qt::Qml Qt::Quick Qt::Widgets KF6::I18n)
