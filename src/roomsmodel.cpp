@@ -3,11 +3,10 @@
 
 #include "roomsmodel.h"
 
+#include "dispatcher.h"
 #include "lib.rs.h"
-#include "sdk/include/callbacks.h"
 #include "utils.h"
 #include "connection.h"
-#include "dispatcher.h"
 
 #include <QPointer>
 
@@ -15,6 +14,7 @@ class RoomsModel::Private
 {
 public:
     QPointer<Connection> connection;
+    std::optional<rust::Box<sdk::Rooms>> rooms;
 };
 
 RoomsModel::~RoomsModel() = default;
@@ -24,7 +24,7 @@ RoomsModel::RoomsModel(QObject *parent)
     , d(std::make_unique<Private>())
 {
     connect(this, &RoomsModel::connectionChanged, this, [this]() {
-        d->connection->connection()->slide();
+        d->rooms = d->connection->connection()->slide();
     });
     connect(Dispatcher::instance(), &Dispatcher::roomsUpdate, this, [this](const auto &matrixId, const auto op, const auto from, const auto to) {
         if (matrixId != d->connection->matrixId()) {
@@ -47,17 +47,17 @@ QVariant RoomsModel::data(const QModelIndex &index, int role) const
 {
     Q_UNUSED(role);
     const auto row = index.row();
-    if (row >= (int) d->connection->connection()->rooms_count()) {
+    if (row >= (int) (*d->rooms)->count()) {
         //TODO why
         return {};
     }
 
     if (role == IdRole) {
-        return stringFromRust(d->connection->connection()->room(row)->id()).toHtmlEscaped();
+        return stringFromRust((*d->rooms)->room(row)->id()).toHtmlEscaped();
     } else if (role == DisplayNameRole) {
-        return stringFromRust(d->connection->connection()->room(row)->display_name()).toHtmlEscaped();
+        return stringFromRust((*d->rooms)->room(row)->display_name()).toHtmlEscaped();
     } else if (role == AvatarUrlRole) {
-        return QStringLiteral("image://roomavatar/%1").arg(stringFromRust(d->connection->connection()->room(row)->id()));
+        return QStringLiteral("image://roomavatar/%1").arg(stringFromRust((*d->rooms)->room(row)->id()));
     }
     return {};
 }
@@ -67,7 +67,7 @@ int RoomsModel::rowCount(const QModelIndex &parent) const
     if (parent.isValid()) {
         return {};
     }
-    return d->connection->connection()->rooms_count();
+    return (*d->rooms)->count();
 }
 
 void RoomsModel::roomsUpdate(std::uint8_t op, std::size_t from, std::size_t to)

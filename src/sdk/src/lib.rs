@@ -3,28 +3,28 @@
 
 use matrix_sdk_ui::sync_service::SyncService;
 use tokio::runtime::Runtime;
-use tokio::sync::RwLock;
-use std::sync::Arc;
 use tokio_stream::StreamExt;
+use std::sync::{Arc, RwLock};
 
 use matrix_sdk::{
     media::MediaFormat, ruma::{RoomId, UserId}, Client
 };
 
-
 struct Connection {
     rt: Runtime,
     client: Client,
-    rooms: Arc<RwLock<Vec<matrix_sdk_ui::room_list_service::Room>>>,
-    timeline_events: Arc<RwLock<Vec<Arc<matrix_sdk_ui::timeline::TimelineItem>>>>,
 }
 
+struct Rooms(Arc<RwLock<Vec<matrix_sdk_ui::room_list_service::Room>>>);
 struct RoomListRoom(matrix_sdk_ui::room_list_service::Room);
-struct TimelineItem(Arc<matrix_sdk_ui::timeline::TimelineItem>);
 
-impl TimelineItem {
-    fn id(&self) -> String {
-        self.0.as_event().map(|event| event.event_id().map(|id| id.to_string()).unwrap_or("no_id".to_string())).unwrap_or("no id".to_string())
+impl Rooms {
+    fn room(&self, index: usize) -> Box<RoomListRoom> {
+        Box::new(RoomListRoom(self.0.read().unwrap()[index].clone()))
+    }
+
+    fn count(&self) -> usize {
+        self.0.read().unwrap().len()
     }
 }
 
@@ -34,6 +34,25 @@ impl RoomListRoom {
     }
     fn display_name(&self) -> String {
         self.0.cached_display_name().unwrap_or("No name available :(".to_string())
+    }
+}
+
+struct Timeline(Arc<RwLock<Vec<Arc<matrix_sdk_ui::timeline::TimelineItem>>>>);
+struct TimelineItem(Arc<matrix_sdk_ui::timeline::TimelineItem>);
+
+impl Timeline {
+    fn count(&self) -> usize {
+        self.0.read().unwrap().len()
+    }
+
+    fn timeline_item(&self, index: usize) -> Box<TimelineItem> {
+        Box::new(TimelineItem(self.0.read().unwrap()[index].clone()))
+    }
+}
+
+impl TimelineItem {
+    fn id(&self) -> String {
+        self.0.as_event().map(|event| event.event_id().map(|id| id.to_string()).unwrap_or("no_id".to_string())).unwrap_or("no id".to_string())
     }
 }
 
@@ -53,24 +72,29 @@ impl Connection {
         Box::new(Connection {
             rt,
             client,
-            rooms: Arc::new(RwLock::new(vec!())),
-            timeline_events: Arc::new(RwLock::new(vec!())),
         })
     }
 
-    fn timeline(&self, room_id: String) {
-        let (client, timeline_events) = self.rt.block_on(async {
-            (self.client.clone(), self.timeline_events.clone())
-        });
+    fn timeline(&self, room_id: String) -> Box<Timeline> {
+        let client = self.client.clone();
+
+        let timeline = Box::new(Timeline(Arc::new(RwLock::new(vec!()))));
+        let timeline_clone = timeline.0.clone();
         self.rt.spawn(async move {
+            let timeline = timeline_clone;
             let matrix_id = client.user_id().map(|it| it.to_string()).unwrap_or("".to_string());
             let room_id = RoomId::parse(room_id).unwrap();
             let room = client.get_room(&room_id).unwrap();
-            let builder = matrix_sdk_ui::timeline::Timeline::builder(&room);
-            let timeline = builder.build().await.unwrap();
-            let (_items, stream) = timeline.subscribe().await;
-
+            let (items, stream) = matrix_sdk_ui::timeline::Timeline::builder(&room).build().await.unwrap().subscribe().await;
             tokio::pin!(stream);
+
+            {
+                let mut write = timeline.write().unwrap();
+                for item in items {
+                    write.push(item);
+                }
+            }
+
             loop {
                 let matrix_id = matrix_id.clone();
                 let room_id = room_id.to_string();
@@ -80,10 +104,10 @@ impl Connection {
                 use matrix_sdk_ui::eyeball_im::VectorDiff;
                 match entry {
                     VectorDiff::Append { values } => {
-                        let from = timeline_events.read().await.len();
+                        let from = timeline.read().unwrap().len();
                         let to = from + values.len() - 1;
                         {
-                            let mut guard = timeline_events.write().await;
+                            let mut guard = timeline.write().unwrap();
                             for item in values {
                                 guard.push(item);
                             }
@@ -91,53 +115,53 @@ impl Connection {
                         ffi::shim_timeline_changed(matrix_id, room_id, 0, from, to);
                     }
                     VectorDiff::Clear => {
-                        let mut guard = timeline_events.write().await;
+                        let mut guard = timeline.write().unwrap();
                         let to = guard.len();
                         guard.clear();
                         ffi::shim_timeline_changed(matrix_id, room_id, 1, 0, to);
                     }
                     VectorDiff::PushFront { value } => {
-                        timeline_events.write().await.insert(0, value);
+                        timeline.write().unwrap().insert(0, value);
                         ffi::shim_timeline_changed(matrix_id, room_id, 2, 0, 0);
                     }
                     VectorDiff::PushBack { value } => {
-                        let mut guard = timeline_events.write().await;
+                        let mut guard = timeline.write().unwrap();
                         let from = guard.len();
                         guard.push(value);
                         ffi::shim_timeline_changed(matrix_id, room_id, 3, from, from);
                     }
                     VectorDiff::PopFront => {
-                        timeline_events.write().await.remove(0);
+                        timeline.write().unwrap().remove(0);
                         ffi::shim_timeline_changed(matrix_id, room_id, 4, 0, 0);
                     }
                     VectorDiff::PopBack => {
-                        let mut guard = timeline_events.write().await;
+                        let mut guard = timeline.write().unwrap();
                         let from = guard.len() - 1;
                         guard.pop();
                         ffi::shim_timeline_changed(matrix_id, room_id, 5, from, from);
                     }
                     VectorDiff::Insert { index, value } => {
-                        timeline_events.write().await.insert(index, value);
+                        timeline.write().unwrap().insert(index, value);
                         ffi::shim_timeline_changed(matrix_id, room_id, 6, index, index);
                     }
                     VectorDiff::Set { index, value } => {
-                        timeline_events.write().await[index] = value;
+                        timeline.write().unwrap()[index] = value;
                         ffi::shim_timeline_changed(matrix_id, room_id, 7, index, index);
                     }
                     VectorDiff::Remove { index } => {
-                        timeline_events.write().await.remove(index);
+                        timeline.write().unwrap().remove(index);
                         ffi::shim_timeline_changed(matrix_id, room_id, 8, index, index);
                     }
                     VectorDiff::Truncate { length } => {
-                        let mut guard = timeline_events.write().await;
+                        let mut guard = timeline.write().unwrap();
                         let to = guard.len();
                         guard.truncate(length);
                         ffi::shim_timeline_changed(matrix_id, room_id, 9, length, to - 1);
                     }
                     VectorDiff::Reset { values } => {
-                        timeline_events.write().await.clear();
+                        timeline.write().unwrap().clear();
                         {
-                            let mut guard = timeline_events.write().await;
+                            let mut guard = timeline.write().unwrap();
                             for item in values {
                                 guard.push(item);
                             }
@@ -147,6 +171,7 @@ impl Connection {
                 };
             }
         });
+        timeline
     }
 
     fn room_avatar(&self, room_id: String) {
@@ -160,41 +185,19 @@ impl Connection {
         });
     }
 
-    fn timeline_item(&self, index: usize) -> Box<TimelineItem> {
-        self.rt.block_on(async {
-            Box::new(TimelineItem(self.timeline_events.read().await[index].clone()))
-        })
-    }
-
     fn device_id(&self) -> String {
         self.rt.block_on(async {
             self.client.device_id().unwrap().to_string()
         })
     }
 
-    fn room(&self, index: usize) -> Box<RoomListRoom> {
-        self.rt.block_on(async {
-            Box::new(RoomListRoom(self.rooms.read().await[index].clone()))
-        })
-    }
+    fn slide(&self) -> Box<Rooms> {
+        let client = self.client.clone();
 
-    fn room_event_count(&self, _room_id: String) -> usize {
-        self.rt.block_on(async {
-            self.timeline_events.read().await.len()
-        })
-    }
-
-    fn rooms_count(&self) -> usize {
-        self.rt.block_on(async {
-            self.rooms.read().await.len()
-        })
-    }
-
-    fn slide(&self) {
-        let (client, rooms) = self.rt.block_on(async {
-            (self.client.clone(), self.rooms.clone())
-        });
+        let rooms = Box::new(Rooms(Arc::new(RwLock::new(vec!()))));
+        let rooms_clone = rooms.0.clone();
         self.rt.spawn(async move {
+            let rooms = rooms_clone;
             let matrix_id = client.user_id().map(|it| it.to_string()).unwrap_or("".to_string());
             let sync_service = SyncService::builder(client).build().await.unwrap();
             let service = sync_service.room_list_service();
@@ -211,10 +214,10 @@ impl Connection {
                     use matrix_sdk_ui::eyeball_im::VectorDiff;
                     match entry {
                         VectorDiff::Append { values } => {
-                            let from = rooms.read().await.len();
+                            let from = rooms.read().unwrap().len();
                             let to = from + values.len() - 1;
                             {
-                                let mut guard = rooms.write().await;
+                                let mut guard = rooms.write().unwrap();
                                 for room in values {
                                     guard.push(room);
                                 }
@@ -222,53 +225,53 @@ impl Connection {
                             ffi::shim_rooms_changed(matrix_id.clone(), 0, from, to);
                         }
                         VectorDiff::Clear => {
-                            let mut guard = rooms.write().await;
+                            let mut guard = rooms.write().unwrap();
                             let to = guard.len();
                             guard.clear();
                             ffi::shim_rooms_changed(matrix_id.clone(), 1, 0, to);
                         }
                         VectorDiff::PushFront { value } => {
-                            rooms.write().await.insert(0, value);
+                            rooms.write().unwrap().insert(0, value);
                             ffi::shim_rooms_changed(matrix_id.clone(), 2, 0, 0);
                         }
                         VectorDiff::PushBack { value } => {
-                            let mut guard = rooms.write().await;
+                            let mut guard = rooms.write().unwrap();
                             let from = guard.len();
                             guard.push(value);
                             ffi::shim_rooms_changed(matrix_id.clone(), 3, from, from);
                         }
                         VectorDiff::PopFront => {
-                            rooms.write().await.remove(0);
+                            rooms.write().unwrap().remove(0);
                             ffi::shim_rooms_changed(matrix_id.clone(), 4, 0, 0);
                         }
                         VectorDiff::PopBack => {
-                            let mut guard = rooms.write().await;
+                            let mut guard = rooms.write().unwrap();
                             let from = guard.len() - 1;
                             guard.pop();
                             ffi::shim_rooms_changed(matrix_id.clone(), 5, from, from);
                         }
                         VectorDiff::Insert { index, value } => {
-                            rooms.write().await.insert(index, value);
+                            rooms.write().unwrap().insert(index, value);
                             ffi::shim_rooms_changed(matrix_id.clone(), 6, index, index);
                         }
                         VectorDiff::Set { index, value } => {
-                            rooms.write().await[index] = value;
+                            rooms.write().unwrap()[index] = value;
                             ffi::shim_rooms_changed(matrix_id.clone(), 7, index, index);
                         }
                         VectorDiff::Remove { index } => {
-                            rooms.write().await.remove(index);
+                            rooms.write().unwrap().remove(index);
                             ffi::shim_rooms_changed(matrix_id.clone(), 8, index, index);
                         }
                         VectorDiff::Truncate { length } => {
-                            let mut guard = rooms.write().await;
+                            let mut guard = rooms.write().unwrap();
                             let to = guard.len();
                             guard.truncate(length);
                             ffi::shim_rooms_changed(matrix_id.clone(), 9, length, to - 1);
                         }
                         VectorDiff::Reset { values } => {
-                            rooms.write().await.clear();
+                            rooms.write().unwrap().clear();
                             {
-                                let mut guard = rooms.write().await;
+                                let mut guard = rooms.write().unwrap();
                                 for room in values {
                                     guard.push(room);
                                 }
@@ -279,6 +282,7 @@ impl Connection {
                 }
             }
         });
+        rooms
     }
 }
 
@@ -293,19 +297,23 @@ mod ffi {
         type Connection;
         type RoomListRoom;
         type TimelineItem;
+        type Rooms;
+        type Timeline;
+
         fn init(matrix_id: String, password: String) -> Box<Connection>;
         fn device_id(self: &Connection) -> String;
-        fn slide(self: &Connection);
-        fn room(self: &Connection, index: usize) -> Box<RoomListRoom>;
-        fn rooms_count(self: &Connection) -> usize;
+        fn slide(self: &Connection) -> Box<Rooms>;
         fn room_avatar(self: &Connection, room_id: String);
-        fn timeline(self: &Connection, room_id: String);
-        fn room_event_count(self: &Connection, room_id: String) -> usize;
-        fn timeline_item(self: &Connection, index: usize) -> Box<TimelineItem>;
+        fn timeline(self: &Connection, room_id: String) -> Box<Timeline>;
+
+        fn room(self: &Rooms, index: usize) -> Box<RoomListRoom>;
+        fn count(self: &Rooms) -> usize;
 
         fn id(self: &RoomListRoom) -> String;
         fn display_name(self: &RoomListRoom) -> String;
 
+        fn count(self: &Timeline) -> usize;
+        fn timeline_item(self: &Timeline, index: usize) -> Box<TimelineItem>;
         fn id(self: &TimelineItem) -> String;
     }
 

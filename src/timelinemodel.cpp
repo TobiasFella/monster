@@ -14,6 +14,7 @@ class TimelineModel::Private
 public:
     QPointer<Connection> connection;
     QString m_roomId;
+    std::optional<rust::Box<sdk::Timeline>> timeline;
 };
 
 TimelineModel::~TimelineModel() = default;
@@ -24,7 +25,7 @@ TimelineModel::TimelineModel(QObject *parent)
 {
     connect(this, &TimelineModel::roomIdChanged, this, [this]() {
         if (d->connection) {
-            d->connection->connection()->timeline(stringToRust(roomId()));
+            d->timeline = d->connection->connection()->timeline(stringToRust(roomId()));
         }
     });
 
@@ -82,7 +83,7 @@ QVariant TimelineModel::data(const QModelIndex &index, int role) const
     const auto row = index.row();
 
     if (role == IdRole) {
-        return stringFromRust(d->connection->connection()->timeline_item(row)->id()).toHtmlEscaped();
+        return stringFromRust((*d->timeline)->timeline_item(row)->id()).toHtmlEscaped();
     }
     return {};
 }
@@ -92,7 +93,7 @@ int TimelineModel::rowCount(const QModelIndex &parent) const
     if (parent.isValid()) {
         return {};
     }
-    return d->connection->connection()->room_event_count(stringToRust(roomId()));
+    return (*d->timeline)->count();
 }
 
 void TimelineModel::timelineUpdate(std::uint8_t op, std::size_t from, std::size_t to)
