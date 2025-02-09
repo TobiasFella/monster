@@ -5,6 +5,7 @@ use matrix_sdk_ui::sync_service::SyncService;
 use tokio::runtime::Runtime;
 use tokio_stream::StreamExt;
 use std::sync::{Arc, RwLock};
+use matrix_sdk_ui::timeline::{VirtualTimelineItem, TimelineItemKind, TimelineItemContent};
 
 use matrix_sdk::{
     media::MediaFormat, ruma::{RoomId, UserId}, Client
@@ -52,7 +53,24 @@ impl Timeline {
 
 impl TimelineItem {
     fn id(&self) -> String {
-        self.0.as_event().map(|event| event.event_id().map(|id| id.to_string()).unwrap_or("no_id".to_string())).unwrap_or("no id".to_string())
+        self.0.as_event().map(|event| event.event_id().map(|id| id.to_string()).unwrap_or_default()).unwrap_or_default()
+    }
+
+    fn body(&self) -> String {
+        match self.0.kind() {
+            TimelineItemKind::Event(event) => {
+                match event.content() {
+                    TimelineItemContent::Message(message) => message.body().to_string(),
+                    _ => "Something else".to_string(),
+                }
+            }
+            TimelineItemKind::Virtual(virt) => {
+                match virt {
+                    VirtualTimelineItem::DateDivider(millis) => format!("{}", millis.0),
+                    VirtualTimelineItem::ReadMarker => "Readmarker".to_string(),
+                }
+            }
+        }
     }
 }
 
@@ -319,7 +337,9 @@ mod ffi {
 
         fn count(self: &Timeline) -> usize;
         fn timeline_item(self: &Timeline, index: usize) -> Box<TimelineItem>;
+
         fn id(self: &TimelineItem) -> String;
+        fn body(self: &TimelineItem) -> String;
     }
 
     unsafe extern "C++" {

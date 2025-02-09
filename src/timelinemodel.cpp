@@ -74,6 +74,7 @@ QHash<int, QByteArray> TimelineModel::roleNames() const
 {
     return {
         {TimelineModel::IdRole, "eventId"},
+        {TimelineModel::BodyRole, "body"},
     };
 }
 
@@ -84,6 +85,9 @@ QVariant TimelineModel::data(const QModelIndex &index, int role) const
 
     if (role == IdRole) {
         return stringFromRust((*d->timeline)->timeline_item(row)->id()).toHtmlEscaped();
+    }
+    if (role == BodyRole) {
+        return stringFromRust((*d->timeline)->timeline_item(row)->body());
     }
     return {};
 }

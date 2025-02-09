@@ -19,6 +19,7 @@ class TimelineModel : public QAbstractListModel
 public:
     enum RoleNames {
         IdRole = Qt::DisplayRole,
+        BodyRole,
     };
     Q_ENUM(RoleNames);
 
