@@ -20,7 +20,7 @@ ecm_add_qml_module(monster URI im.arctic.monster GENERATE_PLUGIN_SOURCE
         QtCore
 )
 
-target_link_libraries(monster PRIVATE sdk Qt::Core Qt::Gui Qt::Qml Qt::Quick Qt::Widgets KF6::I18n)
+target_link_libraries(monster PRIVATE sdk Qt::Core Qt::Gui Qt::Qml Qt::Quick Qt::Widgets KF6::I18n qt6keychain)
 
 target_include_directories(monster PUBLIC
     ${CMAKE_BINARY_DIR}/cargo/build/${Rust_CARGO_TARGET}/cxxbridge/sdk/src/

@@ -4,9 +4,14 @@
 #include "connection.h"
 
 #include <QDebug>
+#include <QGuiApplication>
+
+#include <qt6keychain/keychain.h>
 
 #include "utils.h"
 #include "dispatcher.h"
+
+using namespace Qt::Literals::StringLiterals;
 
 class Connection::Private
 {
@@ -38,6 +43,14 @@ void Connection::login(const QString &matrixId, const QString &password)
             return;
         }
         m_loggedIn = true;
+
+        const auto data = (*d->m_connection)->session();
+
+        auto job = new QKeychain::WritePasswordJob(qAppName());
+        job->setKey("0"_L1);
+        job->setBinaryData({data.data(), (int) data.size()});
+        job->setAutoDelete(true);
+        job->start();
         Q_EMIT loggedInChanged();
     });
 }
@@ -45,6 +58,28 @@ void Connection::login(const QString &matrixId, const QString &password)
 rust::Box<sdk::Connection> &Connection::connection() const
 {
     return *d->m_connection;
+}
+
+void Connection::restore()
+{
+    auto job = new QKeychain::ReadPasswordJob(qAppName());
+    job->setKey("0"_L1);
+    job->setAutoDelete(true);
+    job->start();
+    connect(job, &QKeychain::Job::finished, this, [job, this]() {
+        if (job->error() != QKeychain::NoError) {
+            return;
+        }
+        const auto data = job->binaryData();
+        d->m_connection = sdk::restore(rust::String(data.data(), data.size()));
+    });
+
+
+    connect(Dispatcher::instance(), &Dispatcher::connected, this, [this](const QString &) {
+        m_loggedIn = true;
+        d->matrixId = stringFromRust((*d->m_connection)->matrix_id());
+        Q_EMIT loggedInChanged();
+    });
 }
 
 

@@ -28,6 +28,7 @@ include(ECMQmlModule)
 find_package(Qt6 ${QT_MIN_VERSION} REQUIRED NO_MODULE COMPONENTS Core Quick Gui QuickControls2 Svg Widgets)
 find_package(KF6 ${KF_MIN_VERSION} REQUIRED COMPONENTS I18n)
 find_package(Corrosion REQUIRED)
+find_package(Qt6Keychain REQUIRED)
 
 # if (QT_KNOWN_POLICY_QTP0004)
 #     qt_policy(SET QTP0004 NEW)

@@ -21,6 +21,7 @@ public:
     ~Connection();
 
     Q_INVOKABLE void login(const QString &matrixId, const QString &password);
+    Q_INVOKABLE void restore();
 
     rust::Box<sdk::Connection> &connection() const;
     QString matrixId() const;

@@ -24,6 +24,7 @@ Kirigami.ApplicationWindow {
         id: connection
         Component.onCompleted: {
             RoomAvatarImageProvider.connection = connection;
+            connection.restore();
         }
         onLoggedInChanged: {
             root.pageStack.pop();

@@ -6,7 +6,7 @@ use tokio::runtime::Runtime;
 use tokio_stream::StreamExt;
 use std::sync::{Arc, RwLock};
 use matrix_sdk_ui::timeline::{VirtualTimelineItem, TimelineItemKind, TimelineItemContent};
-
+use matrix_sdk::matrix_auth::MatrixSession;
 use matrix_sdk::{
     media::MediaFormat, ruma::{RoomId, UserId}, Client
 };
@@ -75,6 +75,46 @@ impl TimelineItem {
 }
 
 impl Connection {
+    fn restore(secret: String) -> Box<Connection> {
+        let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
+        let session = serde_json::from_str::<MatrixSession>(
+            std::str::from_utf8(secret.as_bytes()).unwrap(),
+        ).unwrap();
+        let matrix_id = session.meta.user_id.to_string();
+        let client = rt.block_on(async {
+            Client::builder()
+                .server_name(UserId::parse(&session.meta.user_id).unwrap().server_name())
+                .sqlite_store(
+                    dirs::state_dir()
+                    .unwrap()
+                    .join("monster")
+                    .join(session.meta.user_id.to_string()),
+                                None, /* TODO: passphrase */
+                )
+                .build()
+                .await
+                .unwrap()
+        });
+        let client_clone = client.clone();
+        rt.spawn(async move {
+            client_clone.restore_session(session).await.unwrap();
+            ffi::shim_connected(matrix_id);
+        });
+        Box::new(Connection {
+            rt,
+            client,
+        })
+    }
+
+    fn session(&self) -> String {
+        use matrix_sdk::AuthSession;
+        if let AuthSession::Matrix(session) = self.client.session().unwrap() {
+            serde_json::to_string(&session).unwrap()
+        } else {
+            Default::default()
+        }
+    }
+
     fn init(matrix_id: String, password: String) -> Box<Connection> {
         let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
         let client = rt.block_on(async {
@@ -209,9 +249,11 @@ impl Connection {
     }
 
     fn device_id(&self) -> String {
-        self.rt.block_on(async {
-            self.client.device_id().unwrap().to_string()
-        })
+        self.client.device_id().unwrap().to_string()
+    }
+
+    fn matrix_id(&self) -> String {
+        self.client.user_id().unwrap().to_string()
     }
 
     fn slide(&self) -> Box<Rooms> {
@@ -313,6 +355,10 @@ fn init(matrix_id: String, password: String) -> Box<Connection> {
     Connection::init(matrix_id, password)
 }
 
+fn restore(secret: String) -> Box<Connection> {
+    Connection::restore(secret)
+}
+
 #[cxx::bridge]
 mod ffi {
     #[namespace = "sdk"]
@@ -324,10 +370,13 @@ mod ffi {
         type Timeline;
 
         fn init(matrix_id: String, password: String) -> Box<Connection>;
+        fn restore(secret: String) -> Box<Connection>;
         fn device_id(self: &Connection) -> String;
+        fn matrix_id(self: &Connection) -> String;
         fn slide(self: &Connection) -> Box<Rooms>;
         fn room_avatar(self: &Connection, room_id: String);
         fn timeline(self: &Connection, room_id: String) -> Box<Timeline>;
+        fn session(self: &Connection) -> String;
 
         fn room(self: &Rooms, index: usize) -> Box<RoomListRoom>;
         fn count(self: &Rooms) -> usize;
