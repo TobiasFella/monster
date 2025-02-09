@@ -14,7 +14,7 @@ use matrix_sdk::{
 
 struct Connection {
     rt: Runtime,
-    client: Arc<RwLock<Client>>,
+    client: Client,
     rooms: Arc<RwLock<Vec<matrix_sdk_ui::room_list_service::Room>>>,
     timeline_events: Arc<RwLock<Vec<Arc<matrix_sdk_ui::timeline::TimelineItem>>>>,
 }
@@ -42,12 +42,12 @@ impl Connection {
         let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
         let client = rt.block_on(async {
             let user_id = UserId::parse(&matrix_id).unwrap();
-            Arc::new(RwLock::new(Client::builder().server_name(&user_id.server_name()).build().await.unwrap()))
+            Client::builder().server_name(&user_id.server_name()).build().await.unwrap()
         });
         let client_clone = client.clone();
         rt.spawn(async move {
             let user_id = UserId::parse(&matrix_id).unwrap();
-            client_clone.read().await.matrix_auth().login_username(user_id, &password).send().await.unwrap();
+            client_clone.matrix_auth().login_username(user_id, &password).send().await.unwrap();
             ffi::shim_connected(matrix_id);
         });
         Box::new(Connection {
@@ -60,7 +60,7 @@ impl Connection {
 
     fn timeline(&self, room_id: String) {
         let (client, timeline_events) = self.rt.block_on(async {
-            (self.client.read().await.clone(), self.timeline_events.clone())
+            (self.client.clone(), self.timeline_events.clone())
         });
         self.rt.spawn(async move {
             let matrix_id = client.user_id().map(|it| it.to_string()).unwrap_or("".to_string());
@@ -151,7 +151,7 @@ impl Connection {
 
     fn room_avatar(&self, room_id: String) {
         let client = self.rt.block_on(async {
-            self.client.read().await.clone()
+            self.client.clone()
         });
         self.rt.spawn(async move {
             let room_id = RoomId::parse(room_id).unwrap();
@@ -168,7 +168,7 @@ impl Connection {
 
     fn device_id(&self) -> String {
         self.rt.block_on(async {
-            self.client.read().await.device_id().unwrap().to_string()
+            self.client.device_id().unwrap().to_string()
         })
     }
 
@@ -192,7 +192,7 @@ impl Connection {
 
     fn slide(&self) {
         let (client, rooms) = self.rt.block_on(async {
-            (self.client.read().await.clone(), self.rooms.clone())
+            (self.client.clone(), self.rooms.clone())
         });
         self.rt.spawn(async move {
             let matrix_id = client.user_id().map(|it| it.to_string()).unwrap_or("".to_string());
