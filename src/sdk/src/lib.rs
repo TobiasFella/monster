@@ -10,22 +10,31 @@ use matrix_sdk::matrix_auth::MatrixSession;
 use matrix_sdk::{
     media::MediaFormat, ruma::{RoomId, UserId}, Client
 };
+use std::mem::ManuallyDrop;
 
 struct Connection {
     rt: Runtime,
     client: Client,
 }
 
-struct Rooms(Arc<RwLock<Vec<matrix_sdk_ui::room_list_service::Room>>>);
+struct Rooms(Option<ManuallyDrop<Arc<RwLock<Vec<matrix_sdk_ui::room_list_service::Room>>>>>);
 struct RoomListRoom(matrix_sdk_ui::room_list_service::Room);
 
 impl Rooms {
     fn room(&self, index: usize) -> Box<RoomListRoom> {
-        Box::new(RoomListRoom(self.0.read().unwrap()[index].clone()))
+        Box::new(RoomListRoom(self.0.as_ref().unwrap().read().unwrap()[index].clone()))
     }
 
     fn count(&self) -> usize {
-        self.0.read().unwrap().len()
+        self.0.as_ref().unwrap().read().unwrap().len()
+    }
+}
+
+impl Drop for Rooms {
+    fn drop(&mut self) {
+        tokio::runtime::Runtime::new().unwrap().block_on(async {
+            drop(ManuallyDrop::into_inner(self.0.take().unwrap()));
+        })
     }
 }
 
@@ -47,7 +56,7 @@ impl Timeline {
     }
 
     fn timeline_item(&self, index: usize) -> Box<TimelineItem> {
-        Box::new(TimelineItem(self.0.read().unwrap()[index].clone()))
+        Box::new(TimelineItem(self.0.as_ref().read().unwrap()[index].clone()))
     }
 }
 
@@ -259,10 +268,10 @@ impl Connection {
     fn slide(&self) -> Box<Rooms> {
         let client = self.client.clone();
 
-        let rooms = Box::new(Rooms(Arc::new(RwLock::new(vec!()))));
+        let rooms = Box::new(Rooms(Some(ManuallyDrop::new(Arc::new(RwLock::new(vec!()))))));
         let rooms_clone = rooms.0.clone();
         self.rt.spawn(async move {
-            let rooms = rooms_clone;
+            let mut rooms = rooms_clone;
             let matrix_id = client.user_id().map(|it| it.to_string()).unwrap_or("".to_string());
             let sync_service = SyncService::builder(client).build().await.unwrap();
             let service = sync_service.room_list_service();
@@ -279,10 +288,10 @@ impl Connection {
                     use matrix_sdk_ui::eyeball_im::VectorDiff;
                     match entry {
                         VectorDiff::Append { values } => {
-                            let from = rooms.read().unwrap().len();
+                            let from = rooms.as_ref().unwrap().read().unwrap().len();
                             let to = from + values.len() - 1;
                             {
-                                let mut guard = rooms.write().unwrap();
+                                let mut guard = rooms.as_mut().unwrap().write().unwrap();
                                 for room in values {
                                     guard.push(room);
                                 }
@@ -290,53 +299,53 @@ impl Connection {
                             ffi::shim_rooms_changed(matrix_id.clone(), 0, from, to);
                         }
                         VectorDiff::Clear => {
-                            let mut guard = rooms.write().unwrap();
+                            let mut guard = rooms.as_ref().unwrap().write().unwrap();
                             let to = guard.len();
                             guard.clear();
                             ffi::shim_rooms_changed(matrix_id.clone(), 1, 0, to);
                         }
                         VectorDiff::PushFront { value } => {
-                            rooms.write().unwrap().insert(0, value);
+                            rooms.as_mut().unwrap().write().unwrap().insert(0, value);
                             ffi::shim_rooms_changed(matrix_id.clone(), 2, 0, 0);
                         }
                         VectorDiff::PushBack { value } => {
-                            let mut guard = rooms.write().unwrap();
+                            let mut guard = rooms.as_mut().unwrap().write().unwrap();
                             let from = guard.len();
                             guard.push(value);
                             ffi::shim_rooms_changed(matrix_id.clone(), 3, from, from);
                         }
                         VectorDiff::PopFront => {
-                            rooms.write().unwrap().remove(0);
+                            rooms.as_mut().unwrap().write().unwrap().remove(0);
                             ffi::shim_rooms_changed(matrix_id.clone(), 4, 0, 0);
                         }
                         VectorDiff::PopBack => {
-                            let mut guard = rooms.write().unwrap();
+                            let mut guard = rooms.as_mut().unwrap().write().unwrap();
                             let from = guard.len() - 1;
                             guard.pop();
                             ffi::shim_rooms_changed(matrix_id.clone(), 5, from, from);
                         }
                         VectorDiff::Insert { index, value } => {
-                            rooms.write().unwrap().insert(index, value);
+                            rooms.as_mut().unwrap().write().unwrap().insert(index, value);
                             ffi::shim_rooms_changed(matrix_id.clone(), 6, index, index);
                         }
                         VectorDiff::Set { index, value } => {
-                            rooms.write().unwrap()[index] = value;
+                            rooms.as_mut().unwrap().write().unwrap()[index] = value;
                             ffi::shim_rooms_changed(matrix_id.clone(), 7, index, index);
                         }
                         VectorDiff::Remove { index } => {
-                            rooms.write().unwrap().remove(index);
+                            rooms.as_mut().unwrap().write().unwrap().remove(index);
                             ffi::shim_rooms_changed(matrix_id.clone(), 8, index, index);
                         }
                         VectorDiff::Truncate { length } => {
-                            let mut guard = rooms.write().unwrap();
+                            let mut guard = rooms.as_mut().unwrap().write().unwrap();
                             let to = guard.len();
                             guard.truncate(length);
                             ffi::shim_rooms_changed(matrix_id.clone(), 9, length, to - 1);
                         }
                         VectorDiff::Reset { values } => {
-                            rooms.write().unwrap().clear();
+                            rooms.as_mut().unwrap().write().unwrap().clear();
                             {
-                                let mut guard = rooms.write().unwrap();
+                                let mut guard = rooms.as_mut().unwrap().write().unwrap();
                                 for room in values {
                                     guard.push(room);
                                 }
