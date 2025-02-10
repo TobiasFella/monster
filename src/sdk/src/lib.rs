@@ -47,7 +47,7 @@ impl RoomListRoom {
     }
 }
 
-struct Timeline(Arc<RwLock<Vec<Arc<matrix_sdk_ui::timeline::TimelineItem>>>>);
+struct Timeline(Arc<RwLock<Vec<Arc<matrix_sdk_ui::timeline::TimelineItem>>>>, Arc<tokio::sync::RwLock<matrix_sdk_ui::timeline::Timeline>>);
 struct TimelineItem(Arc<matrix_sdk_ui::timeline::TimelineItem>);
 
 impl Timeline {
@@ -115,6 +115,13 @@ impl Connection {
         })
     }
 
+    fn timeline_paginate_back(&self, timeline: &Timeline) {
+        let timeline = timeline.1.clone();
+        self.rt.spawn(async move {
+            timeline.write().await.paginate_backwards(20).await.unwrap();
+        });
+    }
+
     fn session(&self) -> String {
         use matrix_sdk::AuthSession;
         if let AuthSession::Matrix(session) = self.client.session().unwrap() {
@@ -144,15 +151,19 @@ impl Connection {
 
     fn timeline(&self, room_id: String) -> Box<Timeline> {
         let client = self.client.clone();
+        let matrix_id = client.user_id().map(|it| it.to_string()).unwrap_or("".to_string());
+        let room_id = RoomId::parse(room_id).unwrap();
+        let room = client.get_room(&room_id).unwrap();
+        let (timeline, items, stream) = self.rt.block_on(async move {
+            let timeline = matrix_sdk_ui::timeline::Timeline::builder(&room).build().await.unwrap();
+            let (items, stream) = timeline.subscribe().await;
+            (timeline, items, stream)
+        });
 
-        let timeline = Box::new(Timeline(Arc::new(RwLock::new(vec!()))));
-        let timeline_clone = timeline.0.clone();
+        let timeline = Box::new(Timeline(Arc::new(RwLock::new(vec!())), Arc::new(tokio::sync::RwLock::new(timeline))));
+        let timeline_items_clone = timeline.0.clone();
         self.rt.spawn(async move {
-            let timeline = timeline_clone;
-            let matrix_id = client.user_id().map(|it| it.to_string()).unwrap_or("".to_string());
-            let room_id = RoomId::parse(room_id).unwrap();
-            let room = client.get_room(&room_id).unwrap();
-            let (items, stream) = matrix_sdk_ui::timeline::Timeline::builder(&room).build().await.unwrap().subscribe().await;
+            let timeline = timeline_items_clone;
             tokio::pin!(stream);
 
             let mxid = matrix_id.clone();
@@ -386,6 +397,7 @@ mod ffi {
         fn room_avatar(self: &Connection, room_id: String);
         fn timeline(self: &Connection, room_id: String) -> Box<Timeline>;
         fn session(self: &Connection) -> String;
+        fn timeline_paginate_back(self: &Connection, timeline: &Timeline);
 
         fn room(self: &Rooms, index: usize) -> Box<RoomListRoom>;
         fn count(self: &Rooms) -> usize;

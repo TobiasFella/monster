@@ -26,9 +26,10 @@ Kirigami.ScrollablePage {
         }
         delegate: QQC2.ItemDelegate {
             required property string eventId
+            required property string body
 
             width: root.width
-            text: eventId
+            text: body
         }
     }
 }

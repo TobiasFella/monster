@@ -161,3 +161,14 @@ void TimelineModel::timelineUpdate(std::uint8_t op, std::size_t from, std::size_
         }
     }, Qt::QueuedConnection);
 }
+
+
+bool TimelineModel::canFetchMore(const QModelIndex &parent) const
+{
+    return true;
+}
+
+void TimelineModel::fetchMore(const QModelIndex &parent)
+{
+    d->connection->connection()->timeline_paginate_back(**d->timeline);
+}
