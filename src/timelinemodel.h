@@ -4,59 +4,58 @@
 #pragma once
 
 #include <QAbstractListModel>
+#include <QQmlEngine>
 #include <QSortFilterProxyModel>
 #include <qqmlintegration.h>
-#include <QQmlEngine>
 
 class Connection;
 
-class TimelineModel : public QAbstractListModel
-{
-    Q_OBJECT
-    QML_ELEMENT
-    Q_PROPERTY(QString roomId READ roomId WRITE setRoomId NOTIFY roomIdChanged)
-    Q_PROPERTY(Connection *connection READ connection WRITE setConnection NOTIFY connectionChanged)
+class TimelineModel : public QAbstractListModel {
+  Q_OBJECT
+  QML_ELEMENT
+  Q_PROPERTY(QString roomId READ roomId WRITE setRoomId NOTIFY roomIdChanged)
+  Q_PROPERTY(Connection *connection READ connection WRITE setConnection NOTIFY
+                 connectionChanged)
 
 public:
-    enum RoleNames {
-        IdRole = Qt::DisplayRole,
-        BodyRole,
-    };
-    Q_ENUM(RoleNames);
+  enum RoleNames {
+    IdRole = Qt::DisplayRole,
+    BodyRole,
+  };
+  Q_ENUM(RoleNames);
 
-    TimelineModel(QObject *parent = nullptr);
-    ~TimelineModel();
+  TimelineModel(QObject *parent = nullptr);
+  ~TimelineModel();
 
-    QHash<int, QByteArray> roleNames() const override;
-    QVariant data(const QModelIndex &index, int role) const override;
-    int rowCount(const QModelIndex &parent) const override;
+  QHash<int, QByteArray> roleNames() const override;
+  QVariant data(const QModelIndex &index, int role) const override;
+  int rowCount(const QModelIndex &parent) const override;
 
-    bool canFetchMore(const QModelIndex &parent = {}) const override;
-    void fetchMore(const QModelIndex &parent = {}) override;
+  bool canFetchMore(const QModelIndex &parent = {}) const override;
+  void fetchMore(const QModelIndex &parent = {}) override;
 
-    QString roomId() const;
-    void setRoomId(const QString &roomId);
+  QString roomId() const;
+  void setRoomId(const QString &roomId);
 
-    Connection *connection() const;
-    void setConnection(Connection *connection);
-
+  Connection *connection() const;
+  void setConnection(Connection *connection);
 
 Q_SIGNALS:
-    void roomIdChanged();
-    void connectionChanged();
+  void roomIdChanged();
+  void connectionChanged();
 
 private:
-    class Private;
-    std::unique_ptr<Private> d;
-    void timelineUpdate(std::uint8_t op, std::size_t from, std::size_t to);
+  class Private;
+  std::unique_ptr<Private> d;
+  void timelineUpdate(std::uint8_t op, std::size_t from, std::size_t to);
 };
 
-class ReversedTimelineModel : public QSortFilterProxyModel
-{
-    Q_OBJECT
-    QML_ELEMENT
+class ReversedTimelineModel : public QSortFilterProxyModel {
+  Q_OBJECT
+  QML_ELEMENT
 public:
-    explicit ReversedTimelineModel(QObject *parent = nullptr);
+  explicit ReversedTimelineModel(QObject *parent = nullptr);
 
-    bool lessThan(const QModelIndex &sourceLeft, const QModelIndex &sourceRight) const override;
+  bool lessThan(const QModelIndex &sourceLeft,
+                const QModelIndex &sourceRight) const override;
 };

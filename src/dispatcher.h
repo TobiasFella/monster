@@ -6,26 +6,28 @@
 #include <QObject>
 
 /* Dispatcher is used internally to redistribute "callbacks" from Rust to C++.
- * It's the only nice way i have come up with for passing the result of async functions back to C++.
- * It would be nice to have something closer to Qt's connections, where a callback is called on a specific receiver object.
- * But I think Cxx is too limited for that
+ * It's the only nice way i have come up with for passing the result of async
+ * functions back to C++. It would be nice to have something closer to Qt's
+ * connections, where a callback is called on a specific receiver object. But I
+ * think Cxx is too limited for that
  */
-class Dispatcher : public QObject
-{
-    Q_OBJECT
+class Dispatcher : public QObject {
+  Q_OBJECT
 
 public:
-    static Dispatcher *instance() {
-        static Dispatcher _instance;
-        return &_instance;
-    }
+  static Dispatcher *instance() {
+    static Dispatcher _instance;
+    return &_instance;
+  }
 
 Q_SIGNALS:
-    void connected(const QString &userId);
-    void avatarLoaded(const QString &roomId, const QByteArray &data);
-    void roomsUpdate(const QString &matrixId, std::uint8_t op, std::size_t from, std::size_t to);
-    void timelineUpdate(const QString &matrix_id, const QString &room_id, std::uint8_t op, std::size_t from, std::size_t to);
+  void connected(const QString &userId);
+  void avatarLoaded(const QString &roomId, const QByteArray &data);
+  void roomsUpdate(const QString &matrixId, std::uint8_t op, std::size_t from,
+                   std::size_t to);
+  void timelineUpdate(const QString &matrix_id, const QString &room_id,
+                      std::uint8_t op, std::size_t from, std::size_t to);
 
 private:
-    Dispatcher();
+  Dispatcher();
 };
