@@ -79,7 +79,7 @@ impl TimelineItem {
             TimelineItemKind::Event(event) => {
                 match event.content() {
                     TimelineItemContent::Message(message) => message.body().to_string(),
-                    _ => "Something else".to_string(),
+                    event => format!("{:?}", event)
                 }
             }
             TimelineItemKind::Virtual(virt) => {
@@ -142,9 +142,20 @@ impl Connection {
 
     fn init(matrix_id: String, password: String) -> Box<Connection> {
         let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
+        let _ = std::fs::remove_dir_all(dirs::state_dir()
+            .unwrap()
+            .join("monster")
+            .join(&matrix_id));
         let client = rt.block_on(async {
             let user_id = UserId::parse(&matrix_id).unwrap();
-            Client::builder().server_name(&user_id.server_name()).build().await.unwrap()
+            Client::builder().server_name(&user_id.server_name())
+            .sqlite_store(
+                dirs::state_dir()
+                .unwrap()
+                .join("monster")
+                .join(&matrix_id),
+                          None, /* TODO: passphrase */
+            ).build().await.unwrap()
         });
         let client_clone = client.clone();
         rt.spawn(async move {

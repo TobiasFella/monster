@@ -19,7 +19,8 @@ Kirigami.ScrollablePage {
     title: i18nc("@title", "Room")
 
     ListView {
-        anchors.fill: parent
+        id: listView
+
         model: ReversedTimelineModel {
             sourceModel: TimelineModel {
                 connection: root.connection
@@ -31,9 +32,10 @@ Kirigami.ScrollablePage {
         delegate: QQC2.ItemDelegate {
             required property string eventId
             required property string body
+            required property int index
 
-            width: root.width
-            text: body
+            width: parent.width
+            text: (listView.count - index - 1) + " " + body
         }
     }
 }

@@ -102,7 +102,7 @@ int TimelineModel::rowCount(const QModelIndex &parent) const
 
 void TimelineModel::timelineUpdate(std::uint8_t op, std::size_t from, std::size_t to)
 {
-    QMetaObject::invokeMethod(this, [this, op, from, to](){
+    QMetaObject::invokeMethod(this, [this, op, from, to]() {
         switch (op) {
             case 0: {
                 beginInsertRows({}, from, to);
