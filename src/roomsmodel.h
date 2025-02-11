@@ -9,36 +9,36 @@
 
 class Connection;
 
-class RoomsModel : public QAbstractListModel {
-  Q_OBJECT
-  QML_ELEMENT
-  Q_PROPERTY(Connection *connection READ connection WRITE setConnection NOTIFY
-                 connectionChanged)
+class RoomsModel : public QAbstractListModel
+{
+    Q_OBJECT
+    QML_ELEMENT
+    Q_PROPERTY(Connection *connection READ connection WRITE setConnection NOTIFY connectionChanged)
 
 public:
-  enum RoleNames {
-    IdRole = Qt::DisplayRole,
-    DisplayNameRole,
-    AvatarUrlRole,
-  };
-  Q_ENUM(RoleNames);
+    enum RoleNames {
+        IdRole = Qt::DisplayRole,
+        DisplayNameRole,
+        AvatarUrlRole,
+    };
+    Q_ENUM(RoleNames);
 
-  RoomsModel(QObject *parent = nullptr);
-  ~RoomsModel();
+    RoomsModel(QObject *parent = nullptr);
+    ~RoomsModel();
 
-  void setConnection(Connection *connection);
-  Connection *connection() const;
+    void setConnection(Connection *connection);
+    Connection *connection() const;
 
-  QHash<int, QByteArray> roleNames() const override;
-  QVariant data(const QModelIndex &index, int role) const override;
-  int rowCount(const QModelIndex &parent) const override;
+    QHash<int, QByteArray> roleNames() const override;
+    QVariant data(const QModelIndex &index, int role) const override;
+    int rowCount(const QModelIndex &parent) const override;
 
-  void roomsUpdate(std::uint8_t op, std::size_t from, std::size_t to);
+    void roomsUpdate(std::uint8_t op, std::size_t from, std::size_t to);
 
 Q_SIGNALS:
-  void connectionChanged();
+    void connectionChanged();
 
 private:
-  class Private;
-  std::unique_ptr<Private> d;
+    class Private;
+    std::unique_ptr<Private> d;
 };

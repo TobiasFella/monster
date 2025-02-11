@@ -5,3 +5,4 @@ compile_commands.json
 src/.qmlls.ini
 src/sdk/target/
 src/sdk/Cargo.lock
+.clang-format
