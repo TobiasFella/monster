@@ -20,10 +20,14 @@ Kirigami.ScrollablePage {
 
     ListView {
         anchors.fill: parent
-        model: TimelineModel {
-            connection: root.connection
-            roomId: root.roomId
+        model: ReversedTimelineModel {
+            sourceModel: TimelineModel {
+                connection: root.connection
+                roomId: root.roomId
+            }
         }
+        verticalLayoutDirection: ListView.BottomToTop
+
         delegate: QQC2.ItemDelegate {
             required property string eventId
             required property string body

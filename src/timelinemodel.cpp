@@ -94,7 +94,7 @@ QVariant TimelineModel::data(const QModelIndex &index, int role) const
 
 int TimelineModel::rowCount(const QModelIndex &parent) const
 {
-    if (parent.isValid()) {
+    if (parent.isValid() || !d->timeline) {
         return {};
     }
     return (*d->timeline)->count();
@@ -163,12 +163,23 @@ void TimelineModel::timelineUpdate(std::uint8_t op, std::size_t from, std::size_
 }
 
 
-bool TimelineModel::canFetchMore(const QModelIndex &parent) const
+bool TimelineModel::canFetchMore(const QModelIndex &) const
 {
     return true;
 }
 
-void TimelineModel::fetchMore(const QModelIndex &parent)
+void TimelineModel::fetchMore(const QModelIndex &)
 {
     d->connection->connection()->timeline_paginate_back(**d->timeline);
+}
+
+ReversedTimelineModel::ReversedTimelineModel(QObject *parent)
+    :QSortFilterProxyModel(parent)
+{
+    sort(0);
+}
+
+bool ReversedTimelineModel::lessThan(const QModelIndex &sourceLeft, const QModelIndex &sourceRight) const
+{
+    return !QSortFilterProxyModel::lessThan(sourceLeft, sourceRight);
 }
