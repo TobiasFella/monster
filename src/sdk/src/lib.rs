@@ -1,16 +1,18 @@
 // SPDX-FileCopyrightText: 2025 Tobias Fella <tobias.fella@kde.org>
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-use matrix_sdk_ui::sync_service::SyncService;
-use tokio::runtime::Runtime;
-use tokio_stream::StreamExt;
-use std::sync::{Arc, RwLock};
-use matrix_sdk_ui::timeline::{VirtualTimelineItem, TimelineItemKind, TimelineItemContent};
 use matrix_sdk::matrix_auth::MatrixSession;
 use matrix_sdk::{
-    media::MediaFormat, ruma::{RoomId, UserId}, Client
+    media::MediaFormat,
+    ruma::{RoomId, UserId},
+    Client,
 };
+use matrix_sdk_ui::sync_service::SyncService;
+use matrix_sdk_ui::timeline::{TimelineItemContent, TimelineItemKind, VirtualTimelineItem};
 use std::mem::ManuallyDrop;
+use std::sync::{Arc, RwLock};
+use tokio::runtime::Runtime;
+use tokio_stream::StreamExt;
 
 struct Connection {
     rt: Runtime,
@@ -27,7 +29,9 @@ struct RoomListRoom(matrix_sdk_ui::room_list_service::Room);
 
 impl Rooms {
     fn room(&self, index: usize) -> Box<RoomListRoom> {
-        Box::new(RoomListRoom(self.0.as_ref().unwrap().read().unwrap()[index].clone()))
+        Box::new(RoomListRoom(
+            self.0.as_ref().unwrap().read().unwrap()[index].clone(),
+        ))
     }
 
     fn count(&self) -> usize {
@@ -48,7 +52,9 @@ impl RoomListRoom {
         self.0.id().to_string()
     }
     fn display_name(&self) -> String {
-        self.0.cached_display_name().unwrap_or("No name available :(".to_string())
+        self.0
+            .cached_display_name()
+            .unwrap_or("No name available :(".to_string())
     }
 }
 
@@ -56,7 +62,10 @@ impl RoomListRoom {
  * Timeline.0 uses std::sync::RwLock, since this isn't async, which makes it easier to call from C++
  * Timeline.1 uses tokio's RwLock, which can be used in more complex async scenarios, but can only be acquired in an async function
  */
-struct Timeline(Arc<RwLock<Vec<Arc<matrix_sdk_ui::timeline::TimelineItem>>>>, Arc<tokio::sync::RwLock<matrix_sdk_ui::timeline::Timeline>>);
+struct Timeline(
+    Arc<RwLock<Vec<Arc<matrix_sdk_ui::timeline::TimelineItem>>>>,
+    Arc<tokio::sync::RwLock<matrix_sdk_ui::timeline::Timeline>>,
+);
 struct TimelineItem(Arc<matrix_sdk_ui::timeline::TimelineItem>);
 
 impl Timeline {
@@ -71,23 +80,27 @@ impl Timeline {
 
 impl TimelineItem {
     fn id(&self) -> String {
-        self.0.as_event().map(|event| event.event_id().map(|id| id.to_string()).unwrap_or_default()).unwrap_or_default()
+        self.0
+            .as_event()
+            .map(|event| {
+                event
+                    .event_id()
+                    .map(|id| id.to_string())
+                    .unwrap_or_default()
+            })
+            .unwrap_or_default()
     }
 
     fn body(&self) -> String {
         match self.0.kind() {
-            TimelineItemKind::Event(event) => {
-                match event.content() {
-                    TimelineItemContent::Message(message) => message.body().to_string(),
-                    event => format!("{:?}", event)
-                }
-            }
-            TimelineItemKind::Virtual(virt) => {
-                match virt {
-                    VirtualTimelineItem::DateDivider(millis) => format!("{}", millis.0),
-                    VirtualTimelineItem::ReadMarker => "Readmarker".to_string(),
-                }
-            }
+            TimelineItemKind::Event(event) => match event.content() {
+                TimelineItemContent::Message(message) => message.body().to_string(),
+                event => format!("{:?}", event),
+            },
+            TimelineItemKind::Virtual(virt) => match virt {
+                VirtualTimelineItem::DateDivider(millis) => format!("{}", millis.0),
+                VirtualTimelineItem::ReadMarker => "Readmarker".to_string(),
+            },
         }
     }
 }
@@ -95,19 +108,19 @@ impl TimelineItem {
 impl Connection {
     fn restore(secret: String) -> Box<Connection> {
         let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
-        let session = serde_json::from_str::<MatrixSession>(
-            std::str::from_utf8(secret.as_bytes()).unwrap(),
-        ).unwrap();
+        let session =
+            serde_json::from_str::<MatrixSession>(std::str::from_utf8(secret.as_bytes()).unwrap())
+                .unwrap();
         let matrix_id = session.meta.user_id.to_string();
         let client = rt.block_on(async {
             Client::builder()
                 .server_name(UserId::parse(&session.meta.user_id).unwrap().server_name())
                 .sqlite_store(
                     dirs::state_dir()
-                    .unwrap()
-                    .join("monster")
-                    .join(session.meta.user_id.to_string()),
-                                None, /* TODO: passphrase */
+                        .unwrap()
+                        .join("monster")
+                        .join(session.meta.user_id.to_string()),
+                    None, /* TODO: passphrase */
                 )
                 .build()
                 .await
@@ -118,10 +131,7 @@ impl Connection {
             client_clone.restore_session(session).await.unwrap();
             ffi::shim_connected(matrix_id);
         });
-        Box::new(Connection {
-            rt,
-            client,
-        })
+        Box::new(Connection { rt, client })
     }
 
     fn timeline_paginate_back(&self, timeline: &Timeline) {
@@ -142,45 +152,55 @@ impl Connection {
 
     fn init(matrix_id: String, password: String) -> Box<Connection> {
         let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
-        let _ = std::fs::remove_dir_all(dirs::state_dir()
-            .unwrap()
-            .join("monster")
-            .join(&matrix_id));
+        let _ =
+            std::fs::remove_dir_all(dirs::state_dir().unwrap().join("monster").join(&matrix_id));
         let client = rt.block_on(async {
             let user_id = UserId::parse(&matrix_id).unwrap();
-            Client::builder().server_name(&user_id.server_name())
-            .sqlite_store(
-                dirs::state_dir()
+            Client::builder()
+                .server_name(&user_id.server_name())
+                .sqlite_store(
+                    dirs::state_dir().unwrap().join("monster").join(&matrix_id),
+                    None, /* TODO: passphrase */
+                )
+                .build()
+                .await
                 .unwrap()
-                .join("monster")
-                .join(&matrix_id),
-                          None, /* TODO: passphrase */
-            ).build().await.unwrap()
         });
         let client_clone = client.clone();
         rt.spawn(async move {
             let user_id = UserId::parse(&matrix_id).unwrap();
-            client_clone.matrix_auth().login_username(user_id, &password).send().await.unwrap();
+            client_clone
+                .matrix_auth()
+                .login_username(user_id, &password)
+                .send()
+                .await
+                .unwrap();
             ffi::shim_connected(matrix_id);
         });
-        Box::new(Connection {
-            rt,
-            client,
-        })
+        Box::new(Connection { rt, client })
     }
 
     fn timeline(&self, room_id: String) -> Box<Timeline> {
         let client = self.client.clone();
-        let matrix_id = client.user_id().map(|it| it.to_string()).unwrap_or("".to_string());
+        let matrix_id = client
+            .user_id()
+            .map(|it| it.to_string())
+            .unwrap_or("".to_string());
         let room_id = RoomId::parse(room_id).unwrap();
         let room = client.get_room(&room_id).unwrap();
         let (timeline, items, stream) = self.rt.block_on(async move {
-            let timeline = matrix_sdk_ui::timeline::Timeline::builder(&room).build().await.unwrap();
+            let timeline = matrix_sdk_ui::timeline::Timeline::builder(&room)
+                .build()
+                .await
+                .unwrap();
             let (items, stream) = timeline.subscribe().await;
             (timeline, items, stream)
         });
 
-        let timeline = Box::new(Timeline(Arc::new(RwLock::new(vec!())), Arc::new(tokio::sync::RwLock::new(timeline))));
+        let timeline = Box::new(Timeline(
+            Arc::new(RwLock::new(vec![])),
+            Arc::new(tokio::sync::RwLock::new(timeline)),
+        ));
         let timeline_items_clone = timeline.0.clone();
         self.rt.spawn(async move {
             let timeline = timeline_items_clone;
@@ -278,12 +298,16 @@ impl Connection {
     }
 
     fn room_avatar(&self, room_id: String) {
-        let client = self.rt.block_on(async {
-            self.client.clone()
-        });
+        let client = self.rt.block_on(async { self.client.clone() });
         self.rt.spawn(async move {
             let room_id = RoomId::parse(room_id).unwrap();
-            let data = client.get_room(&room_id).unwrap().avatar(MediaFormat::File).await.unwrap().unwrap_or("".into());
+            let data = client
+                .get_room(&room_id)
+                .unwrap()
+                .avatar(MediaFormat::File)
+                .await
+                .unwrap()
+                .unwrap_or("".into());
             ffi::shim_avatar_loaded(room_id.to_string(), data);
         });
     }
@@ -299,11 +323,16 @@ impl Connection {
     fn slide(&self) -> Box<Rooms> {
         let client = self.client.clone();
 
-        let rooms = Box::new(Rooms(Some(ManuallyDrop::new(Arc::new(RwLock::new(vec!()))))));
+        let rooms = Box::new(Rooms(Some(ManuallyDrop::new(Arc::new(RwLock::new(
+            vec![],
+        ))))));
         let rooms_clone = rooms.0.clone();
         self.rt.spawn(async move {
             let mut rooms = rooms_clone;
-            let matrix_id = client.user_id().map(|it| it.to_string()).unwrap_or("".to_string());
+            let matrix_id = client
+                .user_id()
+                .map(|it| it.to_string())
+                .unwrap_or("".to_string());
             let sync_service = SyncService::builder(client).build().await.unwrap();
             let service = sync_service.room_list_service();
             sync_service.start().await;
@@ -356,7 +385,12 @@ impl Connection {
                             ffi::shim_rooms_changed(matrix_id.clone(), 5, from, from);
                         }
                         VectorDiff::Insert { index, value } => {
-                            rooms.as_mut().unwrap().write().unwrap().insert(index, value);
+                            rooms
+                                .as_mut()
+                                .unwrap()
+                                .write()
+                                .unwrap()
+                                .insert(index, value);
                             ffi::shim_rooms_changed(matrix_id.clone(), 6, index, index);
                         }
                         VectorDiff::Set { index, value } => {
@@ -438,7 +472,13 @@ mod ffi {
 
         fn shim_connected(matrix_id: String);
         fn shim_rooms_changed(matrix_id: String, op: u8, from: usize, to: usize);
-        fn shim_timeline_changed(matrix_id: String, room_id: String, op: u8, from: usize, to: usize);
+        fn shim_timeline_changed(
+            matrix_id: String,
+            room_id: String,
+            op: u8,
+            from: usize,
+            to: usize,
+        );
         fn shim_avatar_loaded(room_id: String, data: Vec<u8>);
     }
 }
