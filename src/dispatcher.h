@@ -5,6 +5,11 @@
 
 #include <QObject>
 
+/* Dispatcher is used internally to redistribute "callbacks" from Rust to C++.
+ * It's the only nice way i have come up with for passing the result of async functions back to C++.
+ * It would be nice to have something closer to Qt's connections, where a callback is called on a specific receiver object.
+ * But I think Cxx is too limited for that
+ */
 class Dispatcher : public QObject
 {
     Q_OBJECT

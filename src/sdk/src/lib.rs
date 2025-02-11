@@ -17,6 +17,11 @@ struct Connection {
     client: Client,
 }
 
+/* Why Option<ManuallyDrop<...>>?
+ * The drop function / destructor of room_list_service::Room expects to be called while in a tokio runtime,
+ * which isn't what's happening, since the Rooms object is stored in C++. ManuallyDrop causes the destructor of the inner object to not be called by default,
+ * which prevents this crash. To still clean it up, we implement drop for Rooms and call drop the object explicitely, after entering a runtime. This also requires the Option<...>, since it leaves a (very short) amount of time in which Rooms exists but the inner object has been destroyed already.
+*/
 struct Rooms(Option<ManuallyDrop<Arc<RwLock<Vec<matrix_sdk_ui::room_list_service::Room>>>>>);
 struct RoomListRoom(matrix_sdk_ui::room_list_service::Room);
 
@@ -47,6 +52,10 @@ impl RoomListRoom {
     }
 }
 
+/* There's two different types of RwLock in here!
+ * Timeline.0 uses std::sync::RwLock, since this isn't async, which makes it easier to call from C++
+ * Timeline.1 uses tokio's RwLock, which can be used in more complex async scenarios, but can only be acquired in an async function
+ */
 struct Timeline(Arc<RwLock<Vec<Arc<matrix_sdk_ui::timeline::TimelineItem>>>>, Arc<tokio::sync::RwLock<matrix_sdk_ui::timeline::Timeline>>);
 struct TimelineItem(Arc<matrix_sdk_ui::timeline::TimelineItem>);
 
@@ -379,6 +388,7 @@ fn restore(secret: String) -> Box<Connection> {
     Connection::restore(secret)
 }
 
+// NOTE: When adding functions here, delete the entire build folder. There's probably something missing somewhere to make the header regenerate automatically
 #[cxx::bridge]
 mod ffi {
     #[namespace = "sdk"]
