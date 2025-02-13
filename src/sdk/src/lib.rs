@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2025 Tobias Fella <tobias.fella@kde.org>
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+use matrix_sdk_ui::eyeball_im::VectorDiff;
 use matrix_sdk::matrix_auth::MatrixSession;
 use matrix_sdk::{
     media::MediaFormat,
@@ -62,19 +63,71 @@ impl RoomListRoom {
  * Timeline.0 uses std::sync::RwLock, since this isn't async, which makes it easier to call from C++
  * Timeline.1 uses tokio's RwLock, which can be used in more complex async scenarios, but can only be acquired in an async function
  */
-struct Timeline(
-    Arc<RwLock<Vec<Arc<matrix_sdk_ui::timeline::TimelineItem>>>>,
-    Arc<tokio::sync::RwLock<matrix_sdk_ui::timeline::Timeline>>,
-);
+struct Timeline {
+    queue: Arc<RwLock<Vec<VectorDiff<Arc<matrix_sdk_ui::timeline::TimelineItem>>>>>,
+    timeline: Arc<tokio::sync::RwLock<matrix_sdk_ui::timeline::Timeline>>,
+}
+
 struct TimelineItem(Arc<matrix_sdk_ui::timeline::TimelineItem>);
 
-impl Timeline {
-    fn count(&self) -> usize {
-        self.0.read().unwrap().len()
+struct VecDiff(VectorDiff<Arc<matrix_sdk_ui::timeline::TimelineItem>>);
+
+impl VecDiff {
+    fn op(&self) -> u8 {
+        match self.0 {
+            VectorDiff::Append { .. } => 0,
+            VectorDiff::Clear => 1,
+            VectorDiff::PushFront { .. } => 2,
+            VectorDiff::PushBack { .. } => 3,
+            VectorDiff::PopFront => 4,
+            VectorDiff::PopBack => 5,
+            VectorDiff::Insert { .. } => 6,
+            VectorDiff::Set { .. } => 7,
+            VectorDiff::Remove { .. } => 8,
+            VectorDiff::Truncate { .. } => 9,
+            VectorDiff::Reset { .. } => 10,
+        }
     }
 
-    fn timeline_item(&self, index: usize) -> Box<TimelineItem> {
-        Box::new(TimelineItem(self.0.as_ref().read().unwrap()[index].clone()))
+    fn index(&self) -> usize {
+        match self.0 {
+            VectorDiff::Insert { index, .. } => index,
+            VectorDiff::Set { index, .. } => index,
+            VectorDiff::Remove { index, .. } => index,
+            VectorDiff::Truncate { length, .. } => length,
+            _ => panic!(),
+        }
+    }
+
+    fn item(&self) -> Box<TimelineItem> {
+        match &self.0 {
+            VectorDiff::Insert { value, .. } => Box::new(TimelineItem(value.clone())),
+            VectorDiff::Set { value, .. } => Box::new(TimelineItem(value.clone())),
+            VectorDiff::PushFront { value, .. } => Box::new(TimelineItem(value.clone())),
+            VectorDiff::PushBack { value, .. } => Box::new(TimelineItem(value.clone())),
+            _ => panic!(),
+        }
+    }
+
+    fn items_vec(&self) -> Vec<TimelineItem> {
+        match &self.0 {
+            VectorDiff::Append { values, ..} => values.iter().map(|ti| TimelineItem(ti.clone())).collect(),
+            VectorDiff::Reset { values, ..} => values.iter().map(|ti| TimelineItem(ti.clone())).collect(),
+            _ => panic!()
+        }
+    }
+}
+
+impl Timeline {
+    fn has_queued_item(&self) -> bool {
+        !self.queue.read().unwrap().is_empty()
+    }
+
+    fn queue_next(&self) -> Box<VecDiff> {
+        let mut write = self.queue.write().unwrap();
+        let item = Box::new(VecDiff(write.first().unwrap().clone()));
+        write.remove(0);
+        item
     }
 }
 
@@ -102,6 +155,10 @@ impl TimelineItem {
                 VirtualTimelineItem::ReadMarker => "Readmarker".to_string(),
             },
         }
+    }
+
+    fn box_me(&self) -> Box<TimelineItem> {
+        Box::new(TimelineItem(self.0.clone()))
     }
 }
 
@@ -135,7 +192,7 @@ impl Connection {
     }
 
     fn timeline_paginate_back(&self, timeline: &Timeline) {
-        let timeline = timeline.1.clone();
+        let timeline = timeline.timeline.clone();
         self.rt.spawn(async move {
             timeline.write().await.paginate_backwards(20).await.unwrap();
         });
@@ -197,26 +254,18 @@ impl Connection {
             (timeline, items, stream)
         });
 
-        let timeline = Box::new(Timeline(
-            Arc::new(RwLock::new(vec![])),
-            Arc::new(tokio::sync::RwLock::new(timeline)),
-        ));
-        let timeline_items_clone = timeline.0.clone();
+        let timeline = Box::new(Timeline {
+            queue: Arc::new(RwLock::new(vec![])),
+            timeline: Arc::new(tokio::sync::RwLock::new(timeline)),
+        });
+        let queue = timeline.queue.clone();
         self.rt.spawn(async move {
-            let timeline = timeline_items_clone;
             tokio::pin!(stream);
 
             let mxid = matrix_id.clone();
 
-            {
-                let len = items.len();
-                let mut write = timeline.write().unwrap();
-                for item in items {
-                    write.push(item);
-                }
-
-                ffi::shim_timeline_changed(mxid, room_id.to_string(), 2, 0, len - 1);
-            }
+            queue.write().unwrap().push(VectorDiff::Append{values: items});
+            ffi::shim_timeline_changed(mxid, room_id.to_string());
 
             loop {
                 let matrix_id = matrix_id.clone();
@@ -224,74 +273,8 @@ impl Connection {
                 let Some(entry) = stream.next().await else {
                     continue; //TODO or return?
                 };
-                use matrix_sdk_ui::eyeball_im::VectorDiff;
-                match entry {
-                    VectorDiff::Append { values } => {
-                        let from = timeline.read().unwrap().len();
-                        let to = from + values.len() - 1;
-                        {
-                            let mut guard = timeline.write().unwrap();
-                            for item in values {
-                                guard.push(item);
-                            }
-                        }
-                        ffi::shim_timeline_changed(matrix_id, room_id, 0, from, to);
-                    }
-                    VectorDiff::Clear => {
-                        let mut guard = timeline.write().unwrap();
-                        let to = guard.len();
-                        guard.clear();
-                        ffi::shim_timeline_changed(matrix_id, room_id, 1, 0, to);
-                    }
-                    VectorDiff::PushFront { value } => {
-                        timeline.write().unwrap().insert(0, value);
-                        ffi::shim_timeline_changed(matrix_id, room_id, 2, 0, 0);
-                    }
-                    VectorDiff::PushBack { value } => {
-                        let mut guard = timeline.write().unwrap();
-                        let from = guard.len();
-                        guard.push(value);
-                        ffi::shim_timeline_changed(matrix_id, room_id, 3, from, from);
-                    }
-                    VectorDiff::PopFront => {
-                        timeline.write().unwrap().remove(0);
-                        ffi::shim_timeline_changed(matrix_id, room_id, 4, 0, 0);
-                    }
-                    VectorDiff::PopBack => {
-                        let mut guard = timeline.write().unwrap();
-                        let from = guard.len() - 1;
-                        guard.pop();
-                        ffi::shim_timeline_changed(matrix_id, room_id, 5, from, from);
-                    }
-                    VectorDiff::Insert { index, value } => {
-                        timeline.write().unwrap().insert(index, value);
-                        ffi::shim_timeline_changed(matrix_id, room_id, 6, index, index);
-                    }
-                    VectorDiff::Set { index, value } => {
-                        timeline.write().unwrap()[index] = value;
-                        ffi::shim_timeline_changed(matrix_id, room_id, 7, index, index);
-                    }
-                    VectorDiff::Remove { index } => {
-                        timeline.write().unwrap().remove(index);
-                        ffi::shim_timeline_changed(matrix_id, room_id, 8, index, index);
-                    }
-                    VectorDiff::Truncate { length } => {
-                        let mut guard = timeline.write().unwrap();
-                        let to = guard.len();
-                        guard.truncate(length);
-                        ffi::shim_timeline_changed(matrix_id, room_id, 9, length, to - 1);
-                    }
-                    VectorDiff::Reset { values } => {
-                        timeline.write().unwrap().clear();
-                        {
-                            let mut guard = timeline.write().unwrap();
-                            for item in values {
-                                guard.push(item);
-                            }
-                        }
-                        ffi::shim_timeline_changed(matrix_id, room_id, 10, 0, 0);
-                    }
-                };
+                queue.write().unwrap().push(entry);
+                ffi::shim_timeline_changed(matrix_id, room_id);
             }
         });
         timeline
@@ -443,6 +426,7 @@ mod ffi {
         type TimelineItem;
         type Rooms;
         type Timeline;
+        type VecDiff;
 
         fn init(matrix_id: String, password: String) -> Box<Connection>;
         fn restore(secret: String) -> Box<Connection>;
@@ -460,11 +444,18 @@ mod ffi {
         fn id(self: &RoomListRoom) -> String;
         fn display_name(self: &RoomListRoom) -> String;
 
-        fn count(self: &Timeline) -> usize;
-        fn timeline_item(self: &Timeline, index: usize) -> Box<TimelineItem>;
-
         fn id(self: &TimelineItem) -> String;
         fn body(self: &TimelineItem) -> String;
+        fn box_me(self: &TimelineItem) -> Box<TimelineItem>;
+
+        fn queue_next(self: &Timeline) -> Box<VecDiff>;
+        fn has_queued_item(self: &Timeline) -> bool;
+
+        fn op(self: &VecDiff) -> u8;
+        fn index(self: &VecDiff) -> usize;
+        fn item(self: &VecDiff) -> Box<TimelineItem>;
+        fn items_vec(self: &VecDiff) -> Vec<TimelineItem>;
+
     }
 
     unsafe extern "C++" {
@@ -475,9 +466,6 @@ mod ffi {
         fn shim_timeline_changed(
             matrix_id: String,
             room_id: String,
-            op: u8,
-            from: usize,
-            to: usize,
         );
         fn shim_avatar_loaded(room_id: String, data: Vec<u8>);
     }

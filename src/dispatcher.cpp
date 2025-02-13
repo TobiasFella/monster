@@ -20,9 +20,9 @@ void shim_rooms_changed(rust::String matrixId, std::uint8_t op, std::size_t from
     Q_EMIT Dispatcher::instance()->roomsUpdate(stringFromRust(matrixId), op, from, to);
 }
 
-void shim_timeline_changed(rust::String matrix_id, rust::String room_id, std::uint8_t op, std::size_t from, std::size_t to)
+void shim_timeline_changed(rust::String matrix_id, rust::String room_id)
 {
-    Q_EMIT Dispatcher::instance()->timelineUpdate(stringFromRust(matrix_id), stringFromRust(room_id), op, from, to);
+    Q_EMIT Dispatcher::instance()->timelineUpdate(stringFromRust(matrix_id), stringFromRust(room_id));
 }
 
 Dispatcher::Dispatcher()

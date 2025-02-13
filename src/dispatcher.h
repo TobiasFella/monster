@@ -26,7 +26,7 @@ Q_SIGNALS:
     void connected(const QString &userId);
     void avatarLoaded(const QString &roomId, const QByteArray &data);
     void roomsUpdate(const QString &matrixId, std::uint8_t op, std::size_t from, std::size_t to);
-    void timelineUpdate(const QString &matrix_id, const QString &room_id, std::uint8_t op, std::size_t from, std::size_t to);
+    void timelineUpdate(const QString &matrix_id, const QString &room_id);
 
 private:
     Dispatcher();

@@ -47,15 +47,5 @@ Q_SIGNALS:
 private:
     class Private;
     std::unique_ptr<Private> d;
-    void timelineUpdate(std::uint8_t op, std::size_t from, std::size_t to);
-};
-
-class ReversedTimelineModel : public QSortFilterProxyModel
-{
-    Q_OBJECT
-    QML_ELEMENT
-public:
-    explicit ReversedTimelineModel(QObject *parent = nullptr);
-
-    bool lessThan(const QModelIndex &sourceLeft, const QModelIndex &sourceRight) const override;
+    void timelineUpdate();
 };
