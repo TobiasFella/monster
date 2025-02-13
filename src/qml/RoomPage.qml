@@ -18,10 +18,18 @@ Kirigami.ScrollablePage {
 
     title: i18nc("@title", "Room")
 
+    actions: [
+        Kirigami.Action {
+            text: "Fetch more"
+            onTriggered: timelineModel.fetch()
+        }
+    ]
+
     ListView {
         id: listView
 
         model: TimelineModel {
+            id: timelineModel
             connection: root.connection
             roomId: root.roomId
         }
@@ -32,8 +40,8 @@ Kirigami.ScrollablePage {
             required property string body
             required property int index
 
-            width: parent.width
-            text: (listView.count - index - 1) + " " + body
+            // width: parent.width
+            text: body
         }
     }
 }

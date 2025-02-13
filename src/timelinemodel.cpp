@@ -9,8 +9,6 @@
 
 #include "connection.h"
 
-#include <QTimer>
-
 struct TimelineItemWrapper
 {
     std::optional<rust::Box<sdk::TimelineItem>> item;
@@ -58,10 +56,6 @@ TimelineModel::TimelineModel(QObject *parent)
                 }
                 timelineUpdate();
             });
-
-    QTimer::singleShot(1000, this, [this](){
-        d->connection->connection()->timeline_paginate_back(**d->timeline);
-    });
 }
 
 Connection *TimelineModel::connection() const
@@ -140,7 +134,7 @@ void TimelineModel::timelineUpdate()
                         endInsertRows();
                         break;
                     }
-                    case 1: { // clear
+                    case 1: { // Clear
                         beginResetModel();
                         d->items.clear();
                         endResetModel();
@@ -184,7 +178,7 @@ void TimelineModel::timelineUpdate()
                     case 8: { // Remove
                         beginRemoveRows({}, item->index(), item->index());
                         d->items.removeAt(item->index());
-                        endInsertRows();
+                        endRemoveRows();
                         break;
                     }
                     case 9: { // Truncate
@@ -214,10 +208,15 @@ void TimelineModel::timelineUpdate()
 
 bool TimelineModel::canFetchMore(const QModelIndex &) const
 {
-    return false; //TODO
+    return false;
 }
 
 void TimelineModel::fetchMore(const QModelIndex &)
 {
     d->connection->connection()->timeline_paginate_back(**d->timeline);
+}
+
+void TimelineModel::fetch()
+{
+    fetchMore({});
 }
