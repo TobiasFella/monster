@@ -10,7 +10,7 @@ import org.kde.kirigami as Kirigami
 
 import im.arctic.monster
 
-Kirigami.ScrollablePage {
+Kirigami.Page {
     id: root
 
     required property string roomId
@@ -18,26 +18,49 @@ Kirigami.ScrollablePage {
 
     title: i18nc("@title", "Room")
 
-    ListView {
-        id: listView
+    padding: 0
 
-        model: ReversedTimelineModel {
-            sourceModel: TimelineModel {
-                id: timelineModel
-                connection: root.connection
-                roomId: root.roomId
+    QQC2.ScrollView {
+        anchors.fill: parent
+        anchors.margins: 0
+        clip: true
+        ListView {
+            id: listView
+
+            model: ReversedTimelineModel {
+                sourceModel: TimelineModel {
+                    id: timelineModel
+                    connection: root.connection
+                    roomId: root.roomId
+                }
+            }
+            verticalLayoutDirection: ListView.BottomToTop
+
+            delegate: QQC2.ItemDelegate {
+                required property string eventId
+                required property string body
+                required property int index
+                required property string timestamp
+
+                // width: parent.width
+                text: timestamp + " " + body
             }
         }
-        verticalLayoutDirection: ListView.BottomToTop
+    }
 
-        delegate: QQC2.ItemDelegate {
-            required property string eventId
-            required property string body
-            required property int index
-            required property string timestamp
+    QQC2.TextArea {
+        id: textArea
+        placeholderText: "Message..."
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.margins: 0
+        height: 50
 
-            // width: parent.width
-            text: timestamp + " " + body
+        QQC2.Button {
+            icon.name: "document-send"
+            anchors.right: textArea.right
+            onClicked: timelineModel.sendMessage(textArea.text)
         }
     }
 }

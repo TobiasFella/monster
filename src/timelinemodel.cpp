@@ -230,3 +230,8 @@ bool ReversedTimelineModel::lessThan(const QModelIndex &sourceLeft, const QModel
 {
     return sourceLeft.row() > sourceRight.row();
 }
+
+void TimelineModel::sendMessage(const QString &message)
+{
+    (*d->timeline)->send_message(*d->connection->connection(), stringToRust(message));
+}

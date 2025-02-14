@@ -2,16 +2,19 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 use chrono::prelude::{DateTime, Utc};
-use matrix_sdk_ui::eyeball_im::VectorDiff;
 use matrix_sdk::matrix_auth::MatrixSession;
+use matrix_sdk::ruma::events::room::message::{
+    MessageType, RoomMessageEventContent, TextMessageEventContent,
+};
+use matrix_sdk::ruma::events::AnyMessageLikeEventContent;
 use matrix_sdk::{
     media::MediaFormat,
     ruma::{RoomId, UserId},
     Client,
 };
+use matrix_sdk_ui::eyeball_im::VectorDiff;
 use matrix_sdk_ui::sync_service::SyncService;
 use matrix_sdk_ui::timeline::{TimelineItemContent, TimelineItemKind, VirtualTimelineItem};
-use std::mem::ManuallyDrop;
 use std::sync::{Arc, RwLock};
 use tokio::runtime::Runtime;
 use tokio_stream::StreamExt;
@@ -21,11 +24,6 @@ struct Connection {
     client: Client,
 }
 
-/* Why Option<ManuallyDrop<...>>?
- * The drop function / destructor of room_list_service::Room expects to be called while in a tokio runtime,
- * which isn't what's happening, since the Rooms object is stored in C++. ManuallyDrop causes the destructor of the inner object to not be called by default,
- * which prevents this crash. To still clean it up, we implement drop for Rooms and call drop the object explicitely, after entering a runtime. This also requires the Option<...>, since it leaves a (very short) amount of time in which Rooms exists but the inner object has been destroyed already.
-*/
 struct Rooms {
     queue: Arc<RwLock<Vec<VectorDiff<matrix_sdk_ui::room_list_service::Room>>>>,
 }
@@ -86,13 +84,16 @@ impl RoomListVecDiff {
 
     fn items_vec(&self) -> Vec<RoomListRoom> {
         match &self.0 {
-            VectorDiff::Append { values, ..} => values.iter().map(|ti| RoomListRoom(ti.clone())).collect(),
-            VectorDiff::Reset { values, ..} => values.iter().map(|ti| RoomListRoom(ti.clone())).collect(),
-            _ => panic!()
+            VectorDiff::Append { values, .. } => {
+                values.iter().map(|ti| RoomListRoom(ti.clone())).collect()
+            }
+            VectorDiff::Reset { values, .. } => {
+                values.iter().map(|ti| RoomListRoom(ti.clone())).collect()
+            }
+            _ => panic!(),
         }
     }
 }
-
 
 // impl Drop for Rooms {
 //     fn drop(&mut self) {
@@ -169,9 +170,13 @@ impl VecDiff {
 
     fn items_vec(&self) -> Vec<TimelineItem> {
         match &self.0 {
-            VectorDiff::Append { values, ..} => values.iter().map(|ti| TimelineItem(ti.clone())).collect(),
-            VectorDiff::Reset { values, ..} => values.iter().map(|ti| TimelineItem(ti.clone())).collect(),
-            _ => panic!()
+            VectorDiff::Append { values, .. } => {
+                values.iter().map(|ti| TimelineItem(ti.clone())).collect()
+            }
+            VectorDiff::Reset { values, .. } => {
+                values.iter().map(|ti| TimelineItem(ti.clone())).collect()
+            }
+            _ => panic!(),
         }
     }
 }
@@ -186,6 +191,21 @@ impl Timeline {
         let item = Box::new(VecDiff(write.first().unwrap().clone()));
         write.remove(0);
         item
+    }
+
+    fn send_message(&self, connection: &Connection, message: String) {
+        let timeline = self.timeline.clone();
+        connection.rt.spawn(async move {
+            let content = RoomMessageEventContent::new(MessageType::Text(
+                TextMessageEventContent::plain(message),
+            ));
+            timeline
+                .write()
+                .await
+                .send(AnyMessageLikeEventContent::RoomMessage(content))
+                .await
+                .unwrap();
+        });
     }
 }
 
@@ -332,7 +352,10 @@ impl Connection {
 
             let mxid = matrix_id.clone();
 
-            queue.write().unwrap().push(VectorDiff::Append{values: items});
+            queue
+                .write()
+                .unwrap()
+                .push(VectorDiff::Append { values: items });
             ffi::shim_timeline_changed(mxid, room_id.to_string());
 
             loop {
@@ -375,7 +398,9 @@ impl Connection {
     fn slide(&self) -> Box<Rooms> {
         let client = self.client.clone();
 
-        let rooms = Box::new(Rooms{queue: Arc::new(RwLock::new(vec!()))});
+        let rooms = Box::new(Rooms {
+            queue: Arc::new(RwLock::new(vec![])),
+        });
         let rooms_clone = rooms.queue.clone();
         self.rt.spawn(async move {
             let rooms = rooms_clone;
@@ -445,6 +470,7 @@ mod ffi {
 
         fn queue_next(self: &Timeline) -> Box<VecDiff>;
         fn has_queued_item(self: &Timeline) -> bool;
+        fn send_message(self: &Timeline, connection: &Connection, message: String);
 
         fn queue_next(self: &Rooms) -> Box<RoomListVecDiff>;
         fn has_queued_item(self: &Rooms) -> bool;
@@ -466,10 +492,7 @@ mod ffi {
 
         fn shim_connected(matrix_id: String);
         fn shim_rooms_changed(matrix_id: String);
-        fn shim_timeline_changed(
-            matrix_id: String,
-            room_id: String,
-        );
+        fn shim_timeline_changed(matrix_id: String, room_id: String);
         fn shim_avatar_loaded(room_id: String, data: Vec<u8>);
     }
 }
