@@ -18,13 +18,6 @@ Kirigami.ScrollablePage {
 
     title: i18nc("@title", "Room")
 
-    actions: [
-        Kirigami.Action {
-            text: "Fetch more"
-            onTriggered: timelineModel.fetch()
-        }
-    ]
-
     ListView {
         id: listView
 

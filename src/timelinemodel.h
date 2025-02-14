@@ -41,8 +41,6 @@ public:
     Connection *connection() const;
     void setConnection(Connection *connection);
 
-    Q_INVOKABLE void fetch();
-
 Q_SIGNALS:
     void roomIdChanged();
     void connectionChanged();

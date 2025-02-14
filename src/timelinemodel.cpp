@@ -220,11 +220,6 @@ void TimelineModel::fetchMore(const QModelIndex &)
     d->connection->connection()->timeline_paginate_back(**d->timeline);
 }
 
-void TimelineModel::fetch()
-{
-    fetchMore({});
-}
-
 ReversedTimelineModel::ReversedTimelineModel(QObject *parent)
     : QSortFilterProxyModel(parent)
 {
