@@ -80,3 +80,8 @@ void Connection::restore()
         Q_EMIT loggedInChanged();
     });
 }
+
+void Connection::open(const QString &roomId)
+{
+    Q_EMIT openRoom(roomId);
+}

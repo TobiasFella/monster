@@ -26,9 +26,12 @@ public:
     rust::Box<sdk::Connection> &connection() const;
     QString matrixId() const;
 
+    Q_INVOKABLE void open(const QString &roomId);
+
 Q_SIGNALS:
     void loggedInChanged();
     void avatarLoaded(const QString &roomId, const QByteArray &data);
+    void openRoom(const QString &roomId);
 
 private:
     bool m_loggedIn = false;

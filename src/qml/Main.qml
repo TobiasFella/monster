@@ -32,6 +32,10 @@ Kirigami.ApplicationWindow {
                 connection: connection
             }, {});
         }
+        onOpenRoom: room => pageStack.push(Qt.createComponent("im.arctic.monster", "RoomPage"), {
+            roomId: room,
+            connection: connection,
+        })
     }
 
     pageStack.initialPage: FormCard.FormCardPage {

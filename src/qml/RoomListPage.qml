@@ -31,10 +31,7 @@ Kirigami.ScrollablePage {
             required property string avatarUrl
             text: roomDelegate.displayName
             icon.source: roomDelegate.avatarUrl
-            onClicked: pageStack.push(Qt.createComponent("im.arctic.monster", "RoomPage"), {
-                roomId: roomDelegate.roomId,
-                connection: root.connection,
-            })
+            onClicked: root.connection.open(roomDelegate.roomId)
         }
     }
 }
