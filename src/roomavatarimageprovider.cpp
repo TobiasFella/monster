@@ -7,6 +7,8 @@
 #include "dispatcher.h"
 #include "utils.h"
 
+using namespace Quotient;
+
 RoomAvatarImageProvider::RoomAvatarImageProvider() = default;
 
 QQuickImageResponse *RoomAvatarImageProvider::requestImageResponse(const QString &id, const QSize &requestedSize)

@@ -9,6 +9,8 @@
 
 #include "connection.h"
 
+using namespace Quotient;
+
 struct TimelineItemWrapper
 {
     std::optional<rust::Box<sdk::TimelineItem>> item;

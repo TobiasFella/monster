@@ -7,13 +7,16 @@
 #include <QQmlEngine>
 #include <qqmlintegration.h>
 
+namespace Quotient
+{
 class Connection;
+}
 
 class RoomsModel : public QAbstractListModel
 {
     Q_OBJECT
     QML_ELEMENT
-    Q_PROPERTY(Connection *connection READ connection WRITE setConnection NOTIFY connectionChanged)
+    Q_PROPERTY(Quotient::Connection *connection READ connection WRITE setConnection NOTIFY connectionChanged)
 
 public:
     enum RoleNames {
@@ -26,8 +29,8 @@ public:
     RoomsModel(QObject *parent = nullptr);
     ~RoomsModel();
 
-    void setConnection(Connection *connection);
-    Connection *connection() const;
+    void setConnection(Quotient::Connection *connection);
+    Quotient::Connection *connection() const;
 
     QHash<int, QByteArray> roleNames() const override;
     QVariant data(const QModelIndex &index, int role) const override;

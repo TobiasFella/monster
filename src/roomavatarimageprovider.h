@@ -13,7 +13,7 @@ class RoomAvatarImageProvider : public QQuickAsyncImageProvider
     QML_ELEMENT
     QML_SINGLETON
 
-    Q_PROPERTY(Connection *connection READ connection WRITE setConnection NOTIFY connectionChanged)
+    Q_PROPERTY(Quotient::Connection *connection READ connection WRITE setConnection NOTIFY connectionChanged)
 public:
     QQuickImageResponse *requestImageResponse(const QString &id, const QSize &requestedSize) override;
 
@@ -29,22 +29,22 @@ public:
         return instance();
     }
 
-    Connection *connection() const;
-    void setConnection(Connection *connection);
+    Quotient::Connection *connection() const;
+    void setConnection(Quotient::Connection *connection);
 
 Q_SIGNALS:
     void connectionChanged();
 
 private:
     RoomAvatarImageProvider();
-    QPointer<Connection> m_connection;
+    QPointer<Quotient::Connection> m_connection;
 };
 
 class RoomAvatarImageResponse : public QQuickImageResponse
 {
     Q_OBJECT
 public:
-    RoomAvatarImageResponse(const QString &id, const QSize &requestedSize, Connection *connection);
+    RoomAvatarImageResponse(const QString &id, const QSize &requestedSize, Quotient::Connection *connection);
     QQuickTextureFactory *textureFactory() const override;
 
 private:

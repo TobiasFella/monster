@@ -10,6 +10,8 @@
 
 #include <QPointer>
 
+using namespace Quotient;
+
 struct RoomWrapper
 {
     std::optional<rust::Box<sdk::RoomListRoom>> item;
@@ -18,7 +20,7 @@ struct RoomWrapper
 class RoomsModel::Private
 {
 public:
-    QPointer<Connection> connection;
+    QPointer<Quotient::Connection> connection;
     std::optional<rust::Box<sdk::Rooms>> rooms;
     QList<RoomWrapper *> items;
 

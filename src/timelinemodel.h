@@ -8,14 +8,17 @@
 #include <QSortFilterProxyModel>
 #include <qqmlintegration.h>
 
+namespace Quotient
+{
 class Connection;
+};
 
 class TimelineModel : public QAbstractListModel
 {
     Q_OBJECT
     QML_ELEMENT
     Q_PROPERTY(QString roomId READ roomId WRITE setRoomId NOTIFY roomIdChanged)
-    Q_PROPERTY(Connection *connection READ connection WRITE setConnection NOTIFY connectionChanged)
+    Q_PROPERTY(Quotient::Connection *connection READ connection WRITE setConnection NOTIFY connectionChanged)
 
 public:
     enum RoleNames {
@@ -38,8 +41,8 @@ public:
     QString roomId() const;
     void setRoomId(const QString &roomId);
 
-    Connection *connection() const;
-    void setConnection(Connection *connection);
+    Quotient::Connection *connection() const;
+    void setConnection(Quotient::Connection *connection);
 
     Q_INVOKABLE void sendMessage(const QString &message);
 

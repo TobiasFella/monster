@@ -15,9 +15,19 @@ import im.arctic.monster
 Kirigami.ScrollablePage {
     id: root
 
-    title: i18nc("@title", "Login")
+    title: i18nc("@title", "Rooms")
 
     required property Connection connection
+
+    Connections {
+        target: root.connection
+        function onOpenRoom(): void {
+            room => pageStack.push(Qt.createComponent("im.arctic.monster", "RoomPage"), {
+                roomId: room,
+                connection: connection,
+            });
+        }
+    }
 
     ListView {
         model: RoomsModel {

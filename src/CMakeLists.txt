@@ -9,6 +9,8 @@ add_executable(monster
     utils.cpp
     timelinemodel.cpp
     dispatcher.cpp
+    accounts.cpp
+    pendingconnection.cpp
 )
 
 ecm_add_qml_module(monster URI im.arctic.monster GENERATE_PLUGIN_SOURCE

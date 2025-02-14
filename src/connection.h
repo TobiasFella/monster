@@ -9,19 +9,22 @@
 
 #include "lib.rs.h"
 
+namespace Quotient
+{
+
+struct RustConnectionWrapper
+{
+    std::optional<rust::Box<sdk::Connection>> m_connection;
+};
+
 class Connection : public QObject
 {
     Q_OBJECT
     QML_ELEMENT
-
-    Q_PROPERTY(bool loggedIn MEMBER m_loggedIn NOTIFY loggedInChanged)
+    QML_UNCREATABLE("")
 
 public:
-    Connection(QObject *parent = nullptr);
     ~Connection();
-
-    Q_INVOKABLE void login(const QString &matrixId, const QString &password);
-    Q_INVOKABLE void restore();
 
     rust::Box<sdk::Connection> &connection() const;
     QString matrixId() const;
@@ -34,7 +37,14 @@ Q_SIGNALS:
     void openRoom(const QString &roomId);
 
 private:
-    bool m_loggedIn = false;
     class Private;
     std::unique_ptr<Private> d;
+    friend class PendingConnection;
+
+    Connection(RustConnectionWrapper *wrapper);
+
+    static Connection *loginWithPassword(const QString &matrixId, const QString &password);
+    static Connection *loadAccount(const QString &matrixId);
 };
+
+}

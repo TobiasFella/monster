@@ -20,22 +20,23 @@ Kirigami.ApplicationWindow {
 
     title: i18nc("@title:window", "Monster")
 
-    Connection {
-        id: connection
-        Component.onCompleted: {
+    Accounts {
+        id: accounts
+    }
+
+    Connections {
+        id: pendingConnections
+
+        ignoreUnknownSignals: true
+
+        function onReady() {
+            const connection = (target as PendingConnection).connection();
             RoomAvatarImageProvider.connection = connection;
-            connection.restore();
-        }
-        onLoggedInChanged: {
             root.pageStack.pop();
             root.pageStack.push(Qt.createComponent("im.arctic.monster", "RoomListPage"), {
                 connection: connection
             }, {});
         }
-        onOpenRoom: room => pageStack.push(Qt.createComponent("im.arctic.monster", "RoomPage"), {
-            roomId: room,
-            connection: connection,
-        })
     }
 
     pageStack.initialPage: FormCard.FormCardPage {
@@ -55,7 +56,17 @@ Kirigami.ApplicationWindow {
             }
             FormCard.FormButtonDelegate {
                 text: i18nc("@action:button", "Login")
-                onClicked: connection.login(matrixIdField.text, passwordField.text)
+                onClicked: pendingConnections.target = accounts.loginWithPassword(matrixIdField.text, passwordField.text)
+            }
+        }
+        FormCard.FormCard {
+            Repeater {
+                model: accounts.availableAccounts
+                delegate: FormCard.FormButtonDelegate {
+                    required property string modelData
+                    text: modelData
+                    onClicked: pendingConnections.target = accounts.loadAccount(modelData)
+                }
             }
         }
     }
