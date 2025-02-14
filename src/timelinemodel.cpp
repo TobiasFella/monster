@@ -91,6 +91,7 @@ QHash<int, QByteArray> TimelineModel::roleNames() const
     return {
         {TimelineModel::IdRole, "eventId"},
         {TimelineModel::BodyRole, "body"},
+        {TimelineModel::TimestampRole, "timestamp"},
     };
 }
 
@@ -104,6 +105,9 @@ QVariant TimelineModel::data(const QModelIndex &index, int role) const
     }
     if (role == BodyRole) {
         return stringFromRust((*d->items[row]->item)->body());
+    }
+    if (role == TimestampRole) {
+        return stringFromRust((*d->items[row]->item)->timestamp());
     }
     return {};
 }
@@ -208,7 +212,7 @@ void TimelineModel::timelineUpdate()
 
 bool TimelineModel::canFetchMore(const QModelIndex &) const
 {
-    return false;
+    return true;
 }
 
 void TimelineModel::fetchMore(const QModelIndex &)
@@ -219,4 +223,15 @@ void TimelineModel::fetchMore(const QModelIndex &)
 void TimelineModel::fetch()
 {
     fetchMore({});
+}
+
+ReversedTimelineModel::ReversedTimelineModel(QObject *parent)
+    : QSortFilterProxyModel(parent)
+{
+    sort(0);
+}
+
+bool ReversedTimelineModel::lessThan(const QModelIndex &sourceLeft, const QModelIndex &sourceRight) const
+{
+    return sourceLeft.row() > sourceRight.row();
 }

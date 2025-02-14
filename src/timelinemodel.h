@@ -21,6 +21,7 @@ public:
     enum RoleNames {
         IdRole = Qt::DisplayRole,
         BodyRole,
+        TimestampRole,
     };
     Q_ENUM(RoleNames);
 
@@ -50,4 +51,14 @@ private:
     class Private;
     std::unique_ptr<Private> d;
     void timelineUpdate();
+};
+
+class ReversedTimelineModel : public QSortFilterProxyModel
+{
+    Q_OBJECT
+    QML_ELEMENT
+public:
+    explicit ReversedTimelineModel(QObject *parent = nullptr);
+
+    bool lessThan(const QModelIndex &sourceLeft, const QModelIndex &sourceRight) const override;
 };

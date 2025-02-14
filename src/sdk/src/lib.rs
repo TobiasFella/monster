@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2025 Tobias Fella <tobias.fella@kde.org>
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+use chrono::prelude::{DateTime, Utc};
 use matrix_sdk_ui::eyeball_im::VectorDiff;
 use matrix_sdk::matrix_auth::MatrixSession;
 use matrix_sdk::{
@@ -157,6 +158,16 @@ impl TimelineItem {
         }
     }
 
+    fn timestamp(&self) -> String {
+        match self.0.kind() {
+            TimelineItemKind::Event(event) => {
+                let dt: DateTime<Utc> = event.timestamp().to_system_time().unwrap().clone().into();
+                format!("{}", dt.format("%+"))
+            }
+            _ => Default::default(),
+        }
+    }
+
     fn box_me(&self) -> Box<TimelineItem> {
         Box::new(TimelineItem(self.0.clone()))
     }
@@ -273,6 +284,7 @@ impl Connection {
                 let Some(entry) = stream.next().await else {
                     continue; //TODO or return?
                 };
+
                 queue.write().unwrap().push(entry);
                 ffi::shim_timeline_changed(matrix_id, room_id);
             }
@@ -447,6 +459,7 @@ mod ffi {
         fn id(self: &TimelineItem) -> String;
         fn body(self: &TimelineItem) -> String;
         fn box_me(self: &TimelineItem) -> Box<TimelineItem>;
+        fn timestamp(self: &TimelineItem) -> String;
 
         fn queue_next(self: &Timeline) -> Box<VecDiff>;
         fn has_queued_item(self: &Timeline) -> bool;

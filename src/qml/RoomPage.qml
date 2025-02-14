@@ -28,20 +28,23 @@ Kirigami.ScrollablePage {
     ListView {
         id: listView
 
-        model: TimelineModel {
-            id: timelineModel
-            connection: root.connection
-            roomId: root.roomId
+        model: ReversedTimelineModel {
+            sourceModel: TimelineModel {
+                id: timelineModel
+                connection: root.connection
+                roomId: root.roomId
+            }
         }
-        // verticalLayoutDirection: ListView.BottomToTop
+        verticalLayoutDirection: ListView.BottomToTop
 
         delegate: QQC2.ItemDelegate {
             required property string eventId
             required property string body
             required property int index
+            required property string timestamp
 
             // width: parent.width
-            text: body
+            text: timestamp + " " + body
         }
     }
 }
