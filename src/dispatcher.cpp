@@ -15,9 +15,9 @@ void shim_avatar_loaded(rust::String roomId, rust::Vec<std::uint8_t> _data)
     Q_EMIT Dispatcher::instance()->avatarLoaded(stringFromRust(roomId), QByteArray((const char *)_data.data(), _data.size()));
 }
 
-void shim_rooms_changed(rust::String matrixId, std::uint8_t op, std::size_t from, std::size_t to)
+void shim_rooms_changed(rust::String matrixId)
 {
-    Q_EMIT Dispatcher::instance()->roomsUpdate(stringFromRust(matrixId), op, from, to);
+    Q_EMIT Dispatcher::instance()->roomsUpdate(stringFromRust(matrixId));
 }
 
 void shim_timeline_changed(rust::String matrix_id, rust::String room_id)

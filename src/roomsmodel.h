@@ -33,7 +33,7 @@ public:
     QVariant data(const QModelIndex &index, int role) const override;
     int rowCount(const QModelIndex &parent) const override;
 
-    void roomsUpdate(std::uint8_t op, std::size_t from, std::size_t to);
+    void roomsUpdate();
 
 Q_SIGNALS:
     void connectionChanged();
