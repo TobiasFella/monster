@@ -152,7 +152,7 @@ void TimelineModel::timelineUpdate()
                     }
                     case 3: { // Push Back
                         beginInsertRows({}, rowCount({}), rowCount({}));
-                        d->items.prepend(new TimelineItemWrapper{item->item()});
+                        d->items.append(new TimelineItemWrapper{item->item()});
                         endInsertRows();
                         break;
                     }
