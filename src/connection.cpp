@@ -9,6 +9,7 @@
 #include <qt6keychain/keychain.h>
 
 #include "utils.h"
+#include "dispatcher.h"
 
 using namespace Qt::Literals::StringLiterals;
 using namespace Quotient;
@@ -48,4 +49,16 @@ rust::Box<sdk::Connection> &Connection::connection() const
 void Connection::open(const QString &roomId)
 {
     Q_EMIT openRoom(roomId);
+}
+
+void Connection::logout()
+{
+    connect(Dispatcher::instance(), &Dispatcher::loggedOut, this, [this](const QString &matrixId) {
+        if (matrixId != this->matrixId()) {
+            return;
+        }
+        Q_EMIT loggedOut();
+        deleteLater();
+    });
+    connection()->logout();
 }

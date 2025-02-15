@@ -426,6 +426,26 @@ impl Connection {
         });
         rooms
     }
+
+    fn logout(&self) {
+        let client = self.client.clone();
+        self.rt.spawn(async move {
+            let result = client.matrix_auth().logout().await;
+            use matrix_sdk::RumaApiError::ClientApi;
+            use matrix_sdk::HttpError::Api;
+            use matrix_sdk::ruma::api::error::FromHttpResponseError::Server;
+            use matrix_sdk::ruma::api::client::Error;
+            use http::status::StatusCode;
+            use matrix_sdk::ruma::api::client::error::{ErrorKind, ErrorBody};
+            match result {
+                Err(Api(Server(ClientApi(Error { status_code: StatusCode::UNAUTHORIZED, body: ErrorBody::Standard { kind: ErrorKind::UnknownToken {..}, .. }, .. })))) | Ok(..) => {
+                    ffi::shim_logged_out(client.user_id().unwrap().to_string());
+                },
+                x => eprintln!("Error logging out: {:?}", x),
+
+            }
+        });
+    }
 }
 
 fn init(matrix_id: String, password: String) -> Box<Connection> {
@@ -458,6 +478,7 @@ mod ffi {
         fn timeline(self: &Connection, room_id: String) -> Box<Timeline>;
         fn session(self: &Connection) -> String;
         fn timeline_paginate_back(self: &Connection, timeline: &Timeline);
+        fn logout(self: &Connection);
 
         fn id(self: &RoomListRoom) -> String;
         fn display_name(self: &RoomListRoom) -> String;
@@ -494,5 +515,6 @@ mod ffi {
         fn shim_rooms_changed(matrix_id: String);
         fn shim_timeline_changed(matrix_id: String, room_id: String);
         fn shim_avatar_loaded(room_id: String, data: Vec<u8>);
+        fn shim_logged_out(matrix_id: String);
     }
 }

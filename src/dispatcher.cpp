@@ -3,6 +3,7 @@
 
 #include "dispatcher.h"
 
+#include "sdk/include/callbacks.h"
 #include "utils.h"
 
 void shim_connected(rust::String userId)
@@ -23,6 +24,11 @@ void shim_rooms_changed(rust::String matrixId)
 void shim_timeline_changed(rust::String matrix_id, rust::String room_id)
 {
     Q_EMIT Dispatcher::instance()->timelineUpdate(stringFromRust(matrix_id), stringFromRust(room_id));
+}
+
+void shim_logged_out(rust::String matrixId)
+{
+    Q_EMIT Dispatcher::instance()->loggedOut(stringFromRust(matrixId));
 }
 
 Dispatcher::Dispatcher()

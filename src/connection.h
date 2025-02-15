@@ -30,11 +30,13 @@ public:
     QString matrixId() const;
 
     Q_INVOKABLE void open(const QString &roomId);
+    Q_INVOKABLE void logout();
 
 Q_SIGNALS:
     void loggedInChanged();
     void avatarLoaded(const QString &roomId, const QByteArray &data);
     void openRoom(const QString &roomId);
+    void loggedOut();
 
 private:
     class Private;

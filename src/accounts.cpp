@@ -6,6 +6,9 @@
 #include <QStandardPaths>
 #include <QDebug>
 #include <QDir>
+#include <QGuiApplication>
+
+#include <qt6keychain/keychain.h>
 
 #include "pendingconnection.h"
 
@@ -43,22 +46,43 @@ QStringList Accounts::availableAccounts() const
 
 Quotient::PendingConnection *Accounts::loginWithPassword(const QString &matrixId, const QString &password)
 {
-    auto pending = PendingConnection::loginWithPassword(matrixId, password);
+    auto pending = PendingConnection::loginWithPassword(matrixId, password, this);
 
     m_allAccounts += pending->matrixId();
 
-    const auto dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    auto file = dir + QDir::separator() + u"Accounts"_s;
-    QFile accounts(file);
-    accounts.open(QIODevice::ReadWrite);
-    accounts.write(m_allAccounts.join(u'\n').toUtf8());
-    accounts.close();
-    //TODO: Save to file
+    saveAccounts();
 
     return pending;
 }
 
 Quotient::PendingConnection *Accounts::loadAccount(const QString &matrixId)
 {
-    return PendingConnection::loadAccount(matrixId);
+    return PendingConnection::loadAccount(matrixId, this);
+}
+
+void Accounts::newConnection(Connection *connection)
+{
+    connect(connection, &Connection::loggedOut, this, [connection, this](){
+        m_allAccounts.removeAll(connection->matrixId());
+        saveAccounts();
+        auto job = new QKeychain::DeletePasswordJob(qAppName());
+        job->setKey(connection->matrixId());
+        job->setAutoDelete(true);
+        job->start();
+        connect(job, &QKeychain::Job::finished, this, [job]() {
+            if (job->error() != QKeychain::NoError) {
+                qWarning() << "Failed to delete from keychain" << job->error();
+            }
+        });
+    });
+}
+
+void Accounts::saveAccounts()
+{
+    const auto dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    auto file = dir + QDir::separator() + u"Accounts"_s;
+    QFile accounts(file);
+    accounts.open(QIODevice::WriteOnly);
+    accounts.write(m_allAccounts.join(u'\n').toUtf8());
+    accounts.close();
 }

@@ -12,7 +12,6 @@
 namespace Quotient
 {
 class Connection;
-};
 
 class Accounts : public QObject
 {
@@ -32,6 +31,8 @@ public:
     //! Load an account that is already logged in (i.e., which is listed in Accounts::availableAccounts)
     Q_INVOKABLE Quotient::PendingConnection *loadAccount(const QString &matrixId);
 
+    void newConnection(Quotient::Connection *connection);
+
 Q_SIGNALS:
     void availableAccountsChanged();
 
@@ -40,4 +41,7 @@ private:
     QStringList m_allAccounts;
 
     void loadAccounts();
+    void saveAccounts();
 };
+
+}

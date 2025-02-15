@@ -10,6 +10,7 @@
 
 namespace Quotient
 {
+class Accounts;
 
 class PendingConnection : public QObject
 {
@@ -18,8 +19,8 @@ class PendingConnection : public QObject
     QML_UNCREATABLE("")
 
 public:
-    Q_INVOKABLE static Quotient::PendingConnection *loginWithPassword(const QString &matrixId, const QString &password);
-    Q_INVOKABLE static Quotient::PendingConnection *loadAccount(const QString &matrixId);
+    Q_INVOKABLE static Quotient::PendingConnection *loginWithPassword(const QString &matrixId, const QString &password, Accounts *accounts);
+    Q_INVOKABLE static Quotient::PendingConnection *loadAccount(const QString &matrixId, Accounts *accounts);
 
     /**
      * @brief Get the connection for this PendingConnection.
@@ -43,6 +44,7 @@ private:
     bool m_ready = false;
     QString m_matrixId;
     RustConnectionWrapper *wrapper = nullptr;
+    Quotient::Accounts *m_accounts;
 };
 
 }

@@ -7,15 +7,14 @@
 
 #include <qt6keychain/keychain.h>
 
+#include "accounts.h"
 #include "connection.h"
 #include "dispatcher.h"
 #include "utils.h"
 
-
 using namespace Quotient;
 
 PendingConnection::~PendingConnection() {
-    qWarning() << ".onf";
 }
 
 PendingConnection::PendingConnection() = default;
@@ -25,7 +24,7 @@ void PendingConnection::setMatrixId(const QString &matrixId)
     m_matrixId = matrixId;
 }
 
-Quotient::PendingConnection *PendingConnection::loginWithPassword(const QString &matrixId, const QString &password)
+Quotient::PendingConnection *PendingConnection::loginWithPassword(const QString &matrixId, const QString &password, Accounts *accounts)
 {
     auto pendingConnection = new PendingConnection();
     pendingConnection->setMatrixId(matrixId);
@@ -54,10 +53,11 @@ Quotient::PendingConnection *PendingConnection::loginWithPassword(const QString 
             Q_EMIT pendingConnection->ready();
         });
     });
+    pendingConnection->m_accounts = accounts;
     return pendingConnection;
 }
 
-Quotient::PendingConnection *PendingConnection::loadAccount(const QString &matrixId)
+Quotient::PendingConnection *PendingConnection::loadAccount(const QString &matrixId, Accounts *accounts)
 {
     auto pendingConnection = new PendingConnection();
     pendingConnection->setMatrixId(matrixId);
@@ -79,6 +79,7 @@ Quotient::PendingConnection *PendingConnection::loadAccount(const QString &matri
             Q_EMIT pendingConnection->ready();
         });
     });
+    pendingConnection->m_accounts = accounts;
     return pendingConnection;
 }
 
@@ -88,6 +89,7 @@ Quotient::Connection *PendingConnection::connection()
         return {};
     }
     auto connection = new Connection(wrapper);
+    m_accounts->newConnection(connection);
     wrapper = nullptr;
     return connection;
 }

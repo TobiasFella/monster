@@ -23,10 +23,11 @@ public:
     }
 
 Q_SIGNALS:
-    void connected(const QString &userId);
+    void connected(const QString &matrixId);
     void avatarLoaded(const QString &roomId, const QByteArray &data);
     void roomsUpdate(const QString &matrixId);
     void timelineUpdate(const QString &matrix_id, const QString &room_id);
+    void loggedOut(const QString &matrixId);
 
 private:
     Dispatcher();

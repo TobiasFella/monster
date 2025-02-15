@@ -19,6 +19,13 @@ Kirigami.ScrollablePage {
 
     required property Connection connection
 
+    actions: [
+        Kirigami.Action {
+            text: i18nc("@action:button", "Log out")
+            onTriggered: root.connection.logout()
+        }
+    ]
+
     Connections {
         target: root.connection
         function onOpenRoom(): void {
