@@ -3,6 +3,7 @@
 
 use chrono::prelude::{DateTime, Utc};
 use matrix_sdk::matrix_auth::MatrixSession;
+use matrix_sdk::ruma::api::client::room::Visibility;
 use matrix_sdk::ruma::events::room::message::{
     MessageType, RoomMessageEventContent, TextMessageEventContent,
 };
@@ -431,21 +432,78 @@ impl Connection {
         let client = self.client.clone();
         self.rt.spawn(async move {
             let result = client.matrix_auth().logout().await;
-            use matrix_sdk::RumaApiError::ClientApi;
-            use matrix_sdk::HttpError::Api;
-            use matrix_sdk::ruma::api::error::FromHttpResponseError::Server;
-            use matrix_sdk::ruma::api::client::Error;
             use http::status::StatusCode;
-            use matrix_sdk::ruma::api::client::error::{ErrorKind, ErrorBody};
+            use matrix_sdk::ruma::api::client::error::{ErrorBody, ErrorKind};
+            use matrix_sdk::ruma::api::client::Error;
+            use matrix_sdk::ruma::api::error::FromHttpResponseError::Server;
+            use matrix_sdk::HttpError::Api;
+            use matrix_sdk::RumaApiError::ClientApi;
             match result {
-                Err(Api(Server(ClientApi(Error { status_code: StatusCode::UNAUTHORIZED, body: ErrorBody::Standard { kind: ErrorKind::UnknownToken {..}, .. }, .. })))) | Ok(..) => {
+                Err(Api(Server(ClientApi(Error {
+                    status_code: StatusCode::UNAUTHORIZED,
+                    body:
+                        ErrorBody::Standard {
+                            kind: ErrorKind::UnknownToken { .. },
+                            ..
+                        },
+                    ..
+                }))))
+                | Ok(..) => {
                     ffi::shim_logged_out(client.user_id().unwrap().to_string());
-                },
+                }
                 x => eprintln!("Error logging out: {:?}", x),
-
             }
         });
     }
+
+    fn create_room(&self, room_create_options: &RoomCreateOptions) {
+        let client = self.client.clone();
+        let options = room_create_options.0.clone();
+        self.rt.spawn(async move {
+            client.create_room(options).await.unwrap();
+        });
+    }
+}
+
+#[derive(Clone)]
+struct RoomCreateOptions(matrix_sdk::ruma::api::client::room::create_room::v3::Request);
+
+impl RoomCreateOptions {
+    fn set_invite(&mut self, users: Vec<String>) {
+        self.0.invite = users.iter().map(|it| UserId::parse(&it).unwrap()).collect()
+    }
+
+    fn set_name(&mut self, name: String) {
+        self.0.name = Some(name);
+    }
+
+    fn set_room_alias(&mut self, alias: String) {
+        self.0.room_alias_name = Some(alias);
+    }
+
+    fn set_topic(&mut self, topic: String) {
+        self.0.topic = Some(topic);
+    }
+
+    fn set_visibility_public(&mut self, visibility_public: bool) {
+        self.0.visibility = if visibility_public {
+            Visibility::Public
+        } else {
+            Visibility::Private
+        };
+    }
+    // creation_content: Option<Raw<CreationContent>>,
+    // initial_state: Vec<Raw<AnyInitialStateEvent>>,
+    // power_level_content_override: Option<Raw<RoomPowerLevelsEventContent>>,
+    // preset: Option<RoomPreset>,
+    // room_alias_name: Option<String>,
+    // room_version: Option<RoomVersionId>,
+}
+
+fn room_create_options_new() -> Box<RoomCreateOptions> {
+    Box::new(RoomCreateOptions(
+        matrix_sdk::ruma::api::client::room::create_room::v3::Request::new(),
+    ))
 }
 
 fn init(matrix_id: String, password: String) -> Box<Connection> {
@@ -468,6 +526,7 @@ mod ffi {
         type Timeline;
         type VecDiff;
         type RoomListVecDiff;
+        type RoomCreateOptions;
 
         fn init(matrix_id: String, password: String) -> Box<Connection>;
         fn restore(secret: String) -> Box<Connection>;
@@ -479,6 +538,7 @@ mod ffi {
         fn session(self: &Connection) -> String;
         fn timeline_paginate_back(self: &Connection, timeline: &Timeline);
         fn logout(self: &Connection);
+        fn create_room(self: &Connection, room_create_options: &RoomCreateOptions);
 
         fn id(self: &RoomListRoom) -> String;
         fn display_name(self: &RoomListRoom) -> String;
@@ -506,6 +566,12 @@ mod ffi {
         fn item(self: &RoomListVecDiff) -> Box<RoomListRoom>;
         fn items_vec(self: &RoomListVecDiff) -> Vec<RoomListRoom>;
 
+        fn room_create_options_new() -> Box<RoomCreateOptions>;
+        fn set_invite(self: &mut RoomCreateOptions, users: Vec<String>);
+        fn set_name(self: &mut RoomCreateOptions, name: String);
+        fn set_room_alias(self: &mut RoomCreateOptions, alias: String);
+        fn set_topic(self: &mut RoomCreateOptions, topic: String);
+        fn set_visibility_public(self: &mut RoomCreateOptions, visibility_public: bool);
     }
 
     unsafe extern "C++" {

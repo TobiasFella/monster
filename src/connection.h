@@ -32,6 +32,8 @@ public:
     Q_INVOKABLE void open(const QString &roomId);
     Q_INVOKABLE void logout();
 
+    Q_INVOKABLE void createRoom(const QString &name = {}, const QString &topic = {}, const QString &alias = {});
+
 Q_SIGNALS:
     void loggedInChanged();
     void avatarLoaded(const QString &roomId, const QByteArray &data);

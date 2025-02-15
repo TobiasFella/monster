@@ -23,6 +23,10 @@ Kirigami.ScrollablePage {
         Kirigami.Action {
             text: i18nc("@action:button", "Log out")
             onTriggered: root.connection.logout()
+        },
+        Kirigami.Action {
+            text: i18nc("@action:button", "Create Room")
+            onTriggered: root.connection.createRoom("Hello", "World", "")
         }
     ]
 

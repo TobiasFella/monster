@@ -8,6 +8,7 @@
 
 #include <qt6keychain/keychain.h>
 
+#include "lib.rs.h"
 #include "utils.h"
 #include "dispatcher.h"
 
@@ -61,4 +62,21 @@ void Connection::logout()
         deleteLater();
     });
     connection()->logout();
+}
+
+void Connection::createRoom(const QString &name, const QString &topic, const QString &alias)
+{
+    auto options = sdk::room_create_options_new();
+    if (!name.isEmpty()) {
+        options->set_name(stringToRust(name));
+    }
+
+    if (!topic.isEmpty()) {
+        options->set_topic(stringToRust(topic));
+    }
+
+    if (!alias.isEmpty()) {
+        options->set_room_alias(stringToRust(alias));
+    }
+    connection()->create_room(*options);
 }
