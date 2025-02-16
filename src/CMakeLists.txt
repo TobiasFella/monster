@@ -12,6 +12,7 @@ add_executable(monster
     accounts.cpp
     pendingconnection.cpp
     room.cpp
+    roomstream.cpp
 )
 
 ecm_add_qml_module(monster URI im.arctic.monster GENERATE_PLUGIN_SOURCE

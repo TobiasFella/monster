@@ -37,8 +37,6 @@ public:
     QVariant data(const QModelIndex &index, int role) const override;
     int rowCount(const QModelIndex &parent) const override;
 
-    void roomsUpdate();
-
 Q_SIGNALS:
     void connectionChanged();
 

@@ -6,9 +6,11 @@
 #include <QDebug>
 #include <QGuiApplication>
 
+#include <memory>
 #include <qt6keychain/keychain.h>
 
 #include "lib.rs.h"
+#include "roomstream.h"
 #include "utils.h"
 #include "dispatcher.h"
 #include "room.h"
@@ -20,6 +22,8 @@ class Connection::Private
 {
 public:
     RustConnectionWrapper *wrapper = nullptr;
+
+    std::unique_ptr<RoomStream> roomStream = nullptr;
 
     Private(RustConnectionWrapper *wrapper)
         : wrapper(wrapper)
@@ -86,4 +90,9 @@ Room *Connection::room(const QString &id)
 {
     //TODO cache room objects
     return new Room(connection()->room(stringToRust(id)));
+}
+
+std::unique_ptr<RoomStream> Connection::roomStream()
+{
+    return std::make_unique<RoomStream>(this);
 }

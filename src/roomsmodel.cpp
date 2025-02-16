@@ -4,8 +4,8 @@
 #include "roomsmodel.h"
 
 #include "connection.h"
-#include "dispatcher.h"
 #include "lib.rs.h"
+#include "roomstream.h"
 #include "utils.h"
 
 #include <QPointer>
@@ -21,8 +21,12 @@ class RoomsModel::Private
 {
 public:
     QPointer<Quotient::Connection> connection;
-    std::optional<rust::Box<sdk::Rooms>> rooms;
+    std::unique_ptr<RoomStream> roomStream = nullptr;
     QList<RoomWrapper *> items;
+
+    void roomsUpdate();
+
+    RoomsModel* q = nullptr;
 
     ~Private() {
         for (const auto &item : items) {
@@ -37,15 +41,9 @@ RoomsModel::RoomsModel(QObject *parent)
     : QAbstractListModel(parent)
     , d(std::make_unique<Private>())
 {
-    connect(this, &RoomsModel::connectionChanged, this, [this]() {
-        d->rooms = d->connection->connection()->slide();
-    });
-    connect(Dispatcher::instance(), &Dispatcher::roomsUpdate, this, [this](const auto &matrixId) {
-        if (matrixId != d->connection->matrixId()) {
-            return;
-        }
-        roomsUpdate();
-    });
+    // See "Accessing the Public Class" section in
+    // https://marcmutz.wordpress.com/translated-articles/pimp-my-pimpl-%E2%80%94-reloaded/
+    d->q = this;
 }
 
 QHash<int, QByteArray> RoomsModel::roleNames() const
@@ -83,94 +81,89 @@ int RoomsModel::rowCount(const QModelIndex &parent) const
     return d->items.size();
 }
 
-void RoomsModel::roomsUpdate()
+void RoomsModel::Private::roomsUpdate()
 {
-    QMetaObject::invokeMethod(
-        this,
-        [this]() {
-            while ((*d->rooms)->has_queued_item()) {
-                auto item = (*d->rooms)->queue_next();
-                switch (item->op()) {
-                    case 0: { // Append
-                        auto items = item->items_vec();
-                        beginInsertRows({}, rowCount({}), rowCount({}) + items.size());
-                        for (const auto &it : items) {
-                            auto timelineItem = new RoomWrapper{it.box_me()};
-                            d->items.append(timelineItem);
-                        }
-                        endInsertRows();
-                        break;
-                    }
-                    case 1: { // Clear
-                        beginResetModel();
-                        d->items.clear();
-                        endResetModel();
-                        break;
-                    }
-                    case 2: { // Push Front
-                        beginInsertRows({}, 0, 0);
-                        d->items.prepend(new RoomWrapper{item->item()});
-                        endInsertRows();
-                        break;
-                    }
-                    case 3: { // Push Back
-                        beginInsertRows({}, rowCount({}), rowCount({}));
-                        d->items.prepend(new RoomWrapper{item->item()});
-                        endInsertRows();
-                        break;
-                    }
-                    case 4: { // Pop Front
-                        beginRemoveRows({}, rowCount({}), rowCount({}));
-                        d->items.removeAt(0);
-                        endRemoveRows();
-                        break;
-                    }
-                    case 5: { // Pop Back
-                        beginRemoveRows({}, rowCount({}) - 1, rowCount({}) - 1);
-                        d->items.removeAt(rowCount({}) - 1);
-                        endRemoveRows();
-                        break;
-                    }
-                    case 6: { // Insert
-                        beginInsertRows({}, item->index(), item->index());
-                        d->items.insert(item->index(), new RoomWrapper(item->item()));
-                        endInsertRows();
-                        break;
-                    }
-                    case 7: { // Set
-                        d->items[item->index()] = new RoomWrapper(item->item());
-                        Q_EMIT dataChanged(index(item->index(), 0), index(item->index(), 0));
-                        break;
-                    }
-                    case 8: { // Remove
-                        beginRemoveRows({}, item->index(), item->index());
-                        d->items.removeAt(item->index());
-                        endRemoveRows();
-                        break;
-                    }
-                    case 9: { // Truncate
-                        beginRemoveRows({}, item->index(), rowCount({}) - 1);
-                        for (int i = item->index(); i < rowCount({}); i++) {
-                            d->items.removeAt(item->index());
-                        }
-                        endRemoveRows();
-                        break;
-                    }
-                    case 10: { // Reset
-                        beginResetModel();
-                        d->items.clear();
-                        auto items = item->items_vec();
-                        for (const auto &it : items) {
-                            auto timelineItem = new RoomWrapper{it.box_me()};
-                            d->items.append(timelineItem);
-                        }
-                        endResetModel();
-                        break;
-                    }
-                }
+    const auto diff = roomStream->next();
+
+    switch (diff->op()) {
+        case 0: { // Append
+            auto newItems = diff->items_vec();
+            q->beginInsertRows({}, q->rowCount({}), q->rowCount({}) + newItems.size());
+            for (const auto &it : newItems) {
+                auto timelineItem = new RoomWrapper{it.box_me()};
+                items.append(timelineItem);
             }
-        },
-        Qt::QueuedConnection);
+            q->endInsertRows();
+            break;
+        }
+        case 1: { // Clear
+            q->beginResetModel();
+            items.clear();
+            q->endResetModel();
+            break;
+        }
+        case 2: { // Push Front
+            q->beginInsertRows({}, 0, 0);
+            items.prepend(new RoomWrapper{diff->item()});
+            q->endInsertRows();
+            break;
+        }
+        case 3: { // Push Back
+            q->beginInsertRows({}, q->rowCount({}), q->rowCount({}));
+            items.prepend(new RoomWrapper{diff->item()});
+            q->endInsertRows();
+            break;
+        }
+        case 4: { // Pop Front
+            q->beginRemoveRows({}, q->rowCount({}), q->rowCount({}));
+            items.removeAt(0);
+            q->endRemoveRows();
+            break;
+        }
+        case 5: { // Pop Back
+            q->beginRemoveRows({}, q->rowCount({}) - 1, q->rowCount({}) - 1);
+            items.removeAt(q->rowCount({}) - 1);
+            q->endRemoveRows();
+            break;
+        }
+        case 6: { // Insert
+            q->beginInsertRows({}, diff->index(), diff->index());
+            items.insert(diff->index(), new RoomWrapper(diff->item()));
+            q->endInsertRows();
+            break;
+        }
+        case 7: { // Set
+            items[diff->index()] = new RoomWrapper(diff->item());
+            const auto index = q->index(diff->index(), 0);
+            Q_EMIT q->dataChanged(index, index);
+            break;
+        }
+        case 8: { // Remove
+            q->beginRemoveRows({}, diff->index(), diff->index());
+            items.removeAt(diff->index());
+            q->endRemoveRows();
+            break;
+        }
+        case 9: { // Truncate
+            q->beginRemoveRows({}, diff->index(), q->rowCount({}) - 1);
+            for (int i = diff->index(); i < q->rowCount({}); i++) {
+                items.removeAt(diff->index());
+            }
+            q->endRemoveRows();
+            break;
+        }
+        case 10: { // Reset
+            q->beginResetModel();
+            items.clear();
+            auto newItems = diff->items_vec();
+            for (const auto &it : newItems) {
+                auto timelineItem = new RoomWrapper{it.box_me()};
+                items.append(timelineItem);
+            }
+            q->endResetModel();
+            break;
+        }
+    }
 }
 
 Connection *RoomsModel::connection() const
@@ -184,5 +177,15 @@ void RoomsModel::setConnection(Connection *connection)
         return;
     }
     d->connection = connection;
+
+    if (d->connection != nullptr) {
+        d->roomStream = d->connection->roomStream();
+        connect(d->roomStream.get(), &RoomStream::roomsUpdate, this, [this]() {
+            d->roomsUpdate();
+        });
+
+        d->roomStream->startStream();
+    }
+
     Q_EMIT connectionChanged();
 }

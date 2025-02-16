@@ -12,6 +12,7 @@
 
 namespace Quotient
 {
+class RoomStream;
 
 struct RustConnectionWrapper
 {
@@ -36,6 +37,13 @@ public:
     Q_INVOKABLE void createRoom(const QString &name = {}, const QString &topic = {}, const QString &alias = {});
 
     Q_INVOKABLE Quotient::Room *room(const QString &id);
+
+    /*
+     * @brief Get a room stream for the connection.
+     *
+     * You own this, look after it.
+     */
+    std::unique_ptr<RoomStream> roomStream();
 
 Q_SIGNALS:
     void avatarLoaded(const QString &roomId, const QByteArray &data);
