@@ -19,9 +19,11 @@ class Room : public QObject
     QML_UNCREATABLE("")
 
     Q_PROPERTY(QString displayName READ displayName NOTIFY displayNameChanged)
+    Q_PROPERTY(QString id READ id CONSTANT)
 
 public:
     QString displayName() const;
+    QString id() const;
 
     ~Room();
 

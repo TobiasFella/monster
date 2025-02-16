@@ -13,10 +13,8 @@ import im.arctic.monster
 Kirigami.Page {
     id: root
 
-    required property string roomId
+    required property Room room
     required property Connection connection
-
-    property Room room: connection.room(roomId)
 
     title: room.displayName
 
@@ -33,7 +31,7 @@ Kirigami.Page {
                 sourceModel: TimelineModel {
                     id: timelineModel
                     connection: root.connection
-                    roomId: root.roomId
+                    room: root.room
                 }
             }
             verticalLayoutDirection: ListView.BottomToTop

@@ -34,7 +34,7 @@ Kirigami.ScrollablePage {
         target: root.connection
         function onOpenRoom(): void {
             room => pageStack.push(Qt.createComponent("im.arctic.monster", "RoomPage"), {
-                roomId: room,
+                room: room,
                 connection: connection,
             });
         }

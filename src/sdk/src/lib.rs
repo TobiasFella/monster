@@ -33,6 +33,10 @@ impl Room {
     fn display_name(&self) -> String {
         self.room.name().unwrap_or("This room does not have a name".to_string())
     }
+
+    fn id(&self) -> String {
+        self.room.room_id().to_string()
+    }
 }
 
 struct Room {
@@ -591,6 +595,7 @@ mod ffi {
         fn set_visibility_public(self: &mut RoomCreateOptions, visibility_public: bool);
 
         fn display_name(self: &Room) -> String;
+        fn id(self: &Room) -> String;
     }
 
     unsafe extern "C++" {

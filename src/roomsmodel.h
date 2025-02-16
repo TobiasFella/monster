@@ -23,6 +23,7 @@ public:
         IdRole = Qt::DisplayRole,
         DisplayNameRole,
         AvatarUrlRole,
+        RoomRole,
     };
     Q_ENUM(RoleNames);
 

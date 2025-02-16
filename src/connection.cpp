@@ -50,7 +50,7 @@ rust::Box<sdk::Connection> &Connection::connection() const
 
 void Connection::open(const QString &roomId)
 {
-    Q_EMIT openRoom(roomId);
+    Q_EMIT openRoom(room(roomId));
 }
 
 void Connection::logout()

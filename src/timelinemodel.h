@@ -8,6 +8,8 @@
 #include <QSortFilterProxyModel>
 #include <qqmlintegration.h>
 
+#include "room.h"
+
 namespace Quotient
 {
 class Connection;
@@ -17,7 +19,7 @@ class TimelineModel : public QAbstractListModel
 {
     Q_OBJECT
     QML_ELEMENT
-    Q_PROPERTY(QString roomId READ roomId WRITE setRoomId NOTIFY roomIdChanged)
+    Q_PROPERTY(Quotient::Room *room READ room WRITE setRoom NOTIFY roomChanged)
     Q_PROPERTY(Quotient::Connection *connection READ connection WRITE setConnection NOTIFY connectionChanged)
 
 public:
@@ -38,8 +40,8 @@ public:
     bool canFetchMore(const QModelIndex &parent = {}) const override;
     void fetchMore(const QModelIndex &parent = {}) override;
 
-    QString roomId() const;
-    void setRoomId(const QString &roomId);
+    Quotient::Room *room() const;
+    void setRoom(Quotient::Room *room);
 
     Quotient::Connection *connection() const;
     void setConnection(Quotient::Connection *connection);
@@ -47,7 +49,7 @@ public:
     Q_INVOKABLE void sendMessage(const QString &message);
 
 Q_SIGNALS:
-    void roomIdChanged();
+    void roomChanged();
     void connectionChanged();
 
 private:

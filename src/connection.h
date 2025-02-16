@@ -39,7 +39,7 @@ public:
 
 Q_SIGNALS:
     void avatarLoaded(const QString &roomId, const QByteArray &data);
-    void openRoom(const QString &roomId);
+    void openRoom(Room *room);
     void loggedOut();
 
 private:

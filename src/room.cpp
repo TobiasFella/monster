@@ -26,6 +26,11 @@ QString Room::displayName() const
     return stringFromRust((*d->wrapper->room)->display_name());
 }
 
+QString Room::id() const
+{
+    return stringFromRust((*d->wrapper->room)->id());
+}
+
 Room::~Room() = default;
 
 Room::Room(rust::Box<sdk::Room> room, QObject *parent)

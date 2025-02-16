@@ -27,7 +27,7 @@ public:
 
 public:
     QPointer<Connection> connection;
-    QString m_roomId;
+    QPointer<Room> room;
     std::optional<rust::Box<sdk::Timeline>> timeline;
     QList<TimelineItemWrapper *> items;
 };
@@ -38,22 +38,22 @@ TimelineModel::TimelineModel(QObject *parent)
     : QAbstractListModel(parent)
     , d(std::make_unique<Private>())
 {
-    connect(this, &TimelineModel::roomIdChanged, this, [this]() {
+    connect(this, &TimelineModel::roomChanged, this, [this]() {
         if (d->connection) {
-            d->timeline = d->connection->connection()->timeline(stringToRust(roomId()));
+            d->timeline = d->connection->connection()->timeline(stringToRust(room()->id()));
         }
     });
 
     connect(this, &TimelineModel::connectionChanged, this, [this]() {
-        if (!d->m_roomId.isEmpty()) {
-            d->connection->connection()->timeline(stringToRust(roomId()));
+        if (d->room) {
+            d->timeline = d->connection->connection()->timeline(stringToRust(room()->id()));
         }
     });
     connect(Dispatcher::instance(),
             &Dispatcher::timelineUpdate,
             this,
             [this](const auto &matrixId, const auto &roomId) {
-                if (matrixId != d->connection->matrixId() || roomId != d->m_roomId) {
+                if (matrixId != d->connection->matrixId() || roomId != room()->id()) {
                     return;
                 }
                 timelineUpdate();
@@ -74,18 +74,18 @@ void TimelineModel::setConnection(Connection *connection)
     Q_EMIT connectionChanged();
 }
 
-QString TimelineModel::roomId() const
+Room *TimelineModel::room() const
 {
-    return d->m_roomId;
+    return d->room;
 }
 
-void TimelineModel::setRoomId(const QString &roomId)
+void TimelineModel::setRoom(Room *room)
 {
-    if (roomId == d->m_roomId) {
+    if (room == d->room) {
         return;
     }
-    d->m_roomId = roomId;
-    Q_EMIT roomIdChanged();
+    d->room = room;
+    Q_EMIT roomChanged();
 }
 
 QHash<int, QByteArray> TimelineModel::roleNames() const
@@ -214,12 +214,14 @@ void TimelineModel::timelineUpdate()
 
 bool TimelineModel::canFetchMore(const QModelIndex &) const
 {
-    return true;
+    return room();
 }
 
 void TimelineModel::fetchMore(const QModelIndex &)
 {
-    d->connection->connection()->timeline_paginate_back(**d->timeline);
+    if (room()) {
+        d->connection->connection()->timeline_paginate_back(**d->timeline);
+    }
 }
 
 ReversedTimelineModel::ReversedTimelineModel(QObject *parent)

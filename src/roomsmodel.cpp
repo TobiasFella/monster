@@ -54,6 +54,7 @@ QHash<int, QByteArray> RoomsModel::roleNames() const
         {RoomsModel::IdRole, "roomId"},
         {RoomsModel::DisplayNameRole, "displayName"},
         {RoomsModel::AvatarUrlRole, "avatarUrl"},
+        {RoomsModel::RoomRole, "room"},
     };
 }
 
@@ -68,6 +69,8 @@ QVariant RoomsModel::data(const QModelIndex &index, int role) const
         return stringFromRust((*d->items[row]->item)->display_name()).toHtmlEscaped();
     } else if (role == AvatarUrlRole) {
         return QStringLiteral("image://roomavatar/%1").arg(stringFromRust((*d->items[row]->item)->id()));
+    } else if (role == RoomRole) {
+        return QVariant::fromValue(d->connection->room(stringFromRust((*d->items[row]->item)->id())));
     }
     return {};
 }
