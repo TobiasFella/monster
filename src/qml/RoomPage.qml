@@ -16,7 +16,9 @@ Kirigami.Page {
     required property string roomId
     required property Connection connection
 
-    title: i18nc("@title", "Room")
+    property Room room: connection.room(roomId)
+
+    title: room.displayName
 
     padding: 0
 

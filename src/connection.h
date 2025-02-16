@@ -8,6 +8,7 @@
 #include <qqmlintegration.h>
 
 #include "lib.rs.h"
+#include "room.h"
 
 namespace Quotient
 {
@@ -34,8 +35,9 @@ public:
 
     Q_INVOKABLE void createRoom(const QString &name = {}, const QString &topic = {}, const QString &alias = {});
 
+    Q_INVOKABLE Quotient::Room *room(const QString &id);
+
 Q_SIGNALS:
-    void loggedInChanged();
     void avatarLoaded(const QString &roomId, const QByteArray &data);
     void openRoom(const QString &roomId);
     void loggedOut();

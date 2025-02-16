@@ -11,6 +11,7 @@
 #include "lib.rs.h"
 #include "utils.h"
 #include "dispatcher.h"
+#include "room.h"
 
 using namespace Qt::Literals::StringLiterals;
 using namespace Quotient;
@@ -79,4 +80,10 @@ void Connection::createRoom(const QString &name, const QString &topic, const QSt
         options->set_room_alias(stringToRust(alias));
     }
     connection()->create_room(*options);
+}
+
+Room *Connection::room(const QString &id)
+{
+    //TODO cache room objects
+    return new Room(connection()->room(stringToRust(id)));
 }

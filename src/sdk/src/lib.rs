@@ -29,6 +29,16 @@ struct Rooms {
     queue: Arc<RwLock<Vec<VectorDiff<matrix_sdk_ui::room_list_service::Room>>>>,
 }
 
+impl Room {
+    fn display_name(&self) -> String {
+        self.room.name().unwrap_or("This room does not have a name".to_string())
+    }
+}
+
+struct Room {
+    room: matrix_sdk::room::Room,
+}
+
 struct RoomListRoom(matrix_sdk_ui::room_list_service::Room);
 
 struct RoomListVecDiff(VectorDiff<matrix_sdk_ui::room_list_service::Room>);
@@ -463,6 +473,11 @@ impl Connection {
             client.create_room(options).await.unwrap();
         });
     }
+
+    fn room(&self, id: String) -> Box<Room> {
+        let room_id = RoomId::parse(id).unwrap();
+        Box::new(Room { room: self.client.get_room(&room_id).unwrap() })
+    }
 }
 
 #[derive(Clone)]
@@ -527,6 +542,7 @@ mod ffi {
         type VecDiff;
         type RoomListVecDiff;
         type RoomCreateOptions;
+        type Room;
 
         fn init(matrix_id: String, password: String) -> Box<Connection>;
         fn restore(secret: String) -> Box<Connection>;
@@ -539,6 +555,7 @@ mod ffi {
         fn timeline_paginate_back(self: &Connection, timeline: &Timeline);
         fn logout(self: &Connection);
         fn create_room(self: &Connection, room_create_options: &RoomCreateOptions);
+        fn room(self: &Connection, id: String) -> Box<Room>;
 
         fn id(self: &RoomListRoom) -> String;
         fn display_name(self: &RoomListRoom) -> String;
@@ -572,6 +589,8 @@ mod ffi {
         fn set_room_alias(self: &mut RoomCreateOptions, alias: String);
         fn set_topic(self: &mut RoomCreateOptions, topic: String);
         fn set_visibility_public(self: &mut RoomCreateOptions, visibility_public: bool);
+
+        fn display_name(self: &Room) -> String;
     }
 
     unsafe extern "C++" {
