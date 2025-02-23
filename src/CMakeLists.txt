@@ -13,6 +13,10 @@ add_executable(monster
     pendingconnection.cpp
     room.cpp
     roomstream.cpp
+    roomtreeitem.cpp
+    roomtreemodel.cpp
+    sortfilterroomtreemodel.cpp
+    roomsortparameter.cpp
 )
 
 ecm_add_qml_module(monster URI im.arctic.monster GENERATE_PLUGIN_SOURCE
@@ -20,6 +24,9 @@ ecm_add_qml_module(monster URI im.arctic.monster GENERATE_PLUGIN_SOURCE
         qml/Main.qml
         qml/RoomListPage.qml
         qml/RoomPage.qml
+        qml/RoomDelegate.qml
+        qml/RoomTreeSection.qml
+        qml/AvatarNotification.qml
     DEPENDENCIES
         QtCore
 )

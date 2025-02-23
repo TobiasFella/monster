@@ -21,14 +21,64 @@ public:
     RustRoomWrapper *wrapper = nullptr;
 };
 
+QString Room::id() const
+{
+    return stringFromRust((*d->wrapper->room)->id());
+}
+
+rust::u8 Room::state() const
+{
+    return (*d->wrapper->room)->state();
+}
+
+bool Room::isSpace() const
+{
+    return (*d->wrapper->room)->is_space();
+}
+
+QString Room::roomType() const
+{
+    return stringFromRust((*d->wrapper->room)->room_type());
+}
+
 QString Room::displayName() const
 {
     return stringFromRust((*d->wrapper->room)->display_name());
 }
 
-QString Room::id() const
+bool Room::isTombstoned() const
 {
-    return stringFromRust((*d->wrapper->room)->id());
+    return (*d->wrapper->room)->is_tombstoned();
+}
+
+rust::Box<sdk::RoomTombstoneEventContent> Room::tombstone() const
+{
+    return (*d->wrapper->room)->tombstone();
+}
+
+QString Room::topic() const
+{
+    return stringFromRust((*d->wrapper->room)->topic());
+}
+
+rust::u64 Room::numUnreadMessages() const
+{
+    return (*d->wrapper->room)->num_unread_messages();
+}
+
+rust::u64 Room::numUnreadMentions() const
+{
+    return (*d->wrapper->room)->num_unread_mentions();
+}
+
+bool Room::isFavourite() const
+{
+    return (*d->wrapper->room)->is_favourite();
+}
+
+bool Room::isLowPriority() const
+{
+    return (*d->wrapper->room)->is_low_priority();
 }
 
 Room::~Room() = default;
