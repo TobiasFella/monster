@@ -3,6 +3,8 @@
 
 cmake_minimum_required(VERSION 3.24)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 project(Monster VERSION 0.1.0)
 
 set(KF_MIN_VERSION "6.6")
