@@ -3,10 +3,10 @@
 
 #include "accounts.h"
 
-#include <QStandardPaths>
+#include <QCoreApplication>
 #include <QDebug>
 #include <QDir>
-#include <QGuiApplication>
+#include <QStandardPaths>
 
 #include <qt6keychain/keychain.h>
 
@@ -62,7 +62,7 @@ Quotient::PendingConnection *Accounts::loadAccount(const QString &matrixId)
 
 void Accounts::newConnection(Connection *connection)
 {
-    connect(connection, &Connection::loggedOut, this, [connection, this](){
+    connect(connection, &Connection::loggedOut, this, [connection, this]() {
         m_allAccounts.removeAll(connection->matrixId());
         saveAccounts();
         auto job = new QKeychain::DeletePasswordJob(qAppName());

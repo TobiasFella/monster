@@ -4,57 +4,42 @@
 #include "connection.h"
 
 #include <QDebug>
-#include <QGuiApplication>
 
 #include <memory>
 #include <qt6keychain/keychain.h>
 
-#include "lib.rs.h"
 #include "roomstream.h"
-#include "utils.h"
+#include "connection_p.h"
 #include "dispatcher.h"
+#include "lib.rs.h"
 #include "room.h"
+#include "room_p.h"
+#include "utils.h"
 
 using namespace Qt::Literals::StringLiterals;
 using namespace Quotient;
 
-class Connection::Private
-{
-public:
-    RustConnectionWrapper *wrapper = nullptr;
-
-    std::unique_ptr<RoomStream> roomStream = nullptr;
-
-    Private(RustConnectionWrapper *wrapper)
-        : wrapper(wrapper)
-    {}
-
-    ~Private() {
-        delete wrapper;
-    }
-};
-
 Connection::~Connection() = default;
 
-Connection::Connection(RustConnectionWrapper *wrapper)
+Connection::Connection(std::unique_ptr<Private> d)
     : QObject(nullptr)
-    , d(std::make_unique<Private>(wrapper))
+    , d(std::move(d))
 {
 }
 
 QString Connection::matrixId() const
 {
-    return stringFromRust(connection()->matrix_id());
-}
-
-rust::Box<sdk::Connection> &Connection::connection() const
-{
-    return *d->wrapper->m_connection;
+    return stringFromRust((*d->wrapper->m_connection)->matrix_id());
 }
 
 void Connection::open(const QString &roomId)
 {
     Q_EMIT openRoom(room(roomId));
+}
+
+rust::Box<sdk::Connection> &Connection::Private::connection() const
+{
+    return *wrapper->m_connection;
 }
 
 void Connection::logout()
@@ -66,7 +51,7 @@ void Connection::logout()
         Q_EMIT loggedOut();
         deleteLater();
     });
-    connection()->logout();
+    (*d->wrapper->m_connection)->logout();
 }
 
 void Connection::createRoom(const QString &name, const QString &topic, const QString &alias)
@@ -83,13 +68,18 @@ void Connection::createRoom(const QString &name, const QString &topic, const QSt
     if (!alias.isEmpty()) {
         options->set_room_alias(stringToRust(alias));
     }
-    connection()->create_room(*options);
+    (*d->wrapper->m_connection)->create_room(*options);
 }
 
 Room *Connection::room(const QString &id)
 {
-    //TODO cache room objects
-    return new Room(connection()->room(stringToRust(id)));
+    // TODO cache room objects
+    return new Room(std::make_unique<Room::Private>(new RustRoomWrapper((*d->wrapper->m_connection)->room(stringToRust(id)))));
+}
+
+void Connection::roomAvatar(const QString &roomId)
+{
+    (*d->wrapper->m_connection)->room_avatar(stringToRust(roomId));
 }
 
 std::unique_ptr<RoomStream> Connection::roomStream()

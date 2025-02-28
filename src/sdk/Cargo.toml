@@ -23,3 +23,7 @@ tokio-stream = "0.1.17"
 
 [build-dependencies]
 cxx-build = "1.0.137"
+
+[profile.release]
+opt-level = "z"
+lto = true

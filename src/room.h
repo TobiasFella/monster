@@ -5,14 +5,14 @@
 
 #include <QObject>
 #include <QString>
-#include <qqmlintegration.h>
+#include <QtQmlIntegration/qqmlintegration.h>
 
-#include "lib.rs.h"
+#include "quotient_export.h"
 
 namespace Quotient
 {
 
-class Room : public QObject
+class QUOTIENT_EXPORT Room : public QObject
 {
     Q_OBJECT
     QML_ELEMENT
@@ -32,8 +32,8 @@ Q_SIGNALS:
 
 private:
     friend class Connection;
-    Room(rust::Box<sdk::Room> room, QObject *parent = nullptr);
     class Private;
+    Room(std::unique_ptr<Private> d, QObject *parent = nullptr);
     std::unique_ptr<Private> d;
 };
 

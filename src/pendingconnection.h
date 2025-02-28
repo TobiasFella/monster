@@ -4,15 +4,17 @@
 #pragma once
 
 #include <QObject>
-#include <qqmlintegration.h>
+#include <QtQmlIntegration/qqmlintegration.h>
 
 #include "connection.h"
+
+#include "quotient_export.h"
 
 namespace Quotient
 {
 class Accounts;
 
-class PendingConnection : public QObject
+class QUOTIENT_EXPORT PendingConnection : public QObject
 {
     Q_OBJECT
     QML_ELEMENT
@@ -37,13 +39,14 @@ Q_SIGNALS:
     void ready();
 
 private:
+    class Private;
+    std::unique_ptr<Private> d;
     PendingConnection();
     void setMatrixId(const QString &matrixId);
 
-    //TODO: Make this an error enum instead
+    // TODO: Make this an error enum instead
     bool m_ready = false;
     QString m_matrixId;
-    RustConnectionWrapper *wrapper = nullptr;
     Quotient::Accounts *m_accounts;
 };
 

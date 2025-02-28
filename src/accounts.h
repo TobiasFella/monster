@@ -5,15 +5,17 @@
 
 #include <QList>
 #include <QObject>
-#include <qqmlintegration.h>
+#include <QtQmlIntegration/qqmlintegration.h>
 
 #include "pendingconnection.h"
+
+#include "quotient_export.h"
 
 namespace Quotient
 {
 class Connection;
 
-class Accounts : public QObject
+class QUOTIENT_EXPORT Accounts : public QObject
 {
     Q_OBJECT
     QML_ELEMENT

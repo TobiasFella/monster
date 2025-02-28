@@ -3,10 +3,11 @@
 
 #include "roomsmodel.h"
 
-#include "connection.h"
-#include "lib.rs.h"
-#include "roomstream.h"
-#include "utils.h"
+#include <QuotientNg/Connection>
+#include <QuotientNg/Dispatcher>
+#include <QuotientNg/lib.rs.h>
+#include <QuotientNg/Utils>
+#include <QuotientNg/Connection_p>
 
 #include <QPointer>
 
@@ -41,9 +42,16 @@ RoomsModel::RoomsModel(QObject *parent)
     : QAbstractListModel(parent)
     , d(std::make_unique<Private>())
 {
-    // See "Accessing the Public Class" section in
-    // https://marcmutz.wordpress.com/translated-articles/pimp-my-pimpl-%E2%80%94-reloaded/
     d->q = this;
+    // connect(this, &RoomsModel::connectionChanged, this, [this]() {
+    //     d->rooms = d->connection->d->connection()->slide();
+    // });
+    // connect(Dispatcher::instance(), &Dispatcher::roomsUpdate, this, [this](const auto &matrixId) {
+    //     if (matrixId != d->connection->matrixId()) {
+    //         return;
+    //     }
+    //     roomsUpdate();
+    // });
 }
 
 QHash<int, QByteArray> RoomsModel::roleNames() const

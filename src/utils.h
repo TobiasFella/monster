@@ -1,12 +1,18 @@
 // SPDX-FileCopyrightText: 2025 Tobias Fella <tobias.fella@kde.org>
 // SPDX-License-Identifier: LGPL-2.0-or-later
 
+#if __has_include("lib.rs.h")
 #include "lib.rs.h"
+#else
+#include <QuotientNg/lib.rs.h>
+#endif
 
 #include <QString>
 
-rust::String stringToRust(const QString &string);
+#include "quotient_export.h"
 
-QString stringFromRust(rust::String string);
+QUOTIENT_EXPORT rust::String stringToRust(const QString &string);
 
-rust::String stringToRust(const char *string);
+QUOTIENT_EXPORT QString stringFromRust(rust::String string);
+
+QUOTIENT_EXPORT rust::String stringToRust(const char *string);

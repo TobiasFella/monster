@@ -4,18 +4,19 @@
 #pragma once
 
 #include <QAbstractListModel>
-#include <QQmlEngine>
 #include <QSortFilterProxyModel>
-#include <qqmlintegration.h>
+#include <QtQmlIntegration/qqmlintegration.h>
 
-#include "room.h"
+#include <QuotientNg/Room>
+
+#include "quotient_export.h"
 
 namespace Quotient
 {
 class Connection;
 };
 
-class TimelineModel : public QAbstractListModel
+class QUOTIENT_EXPORT TimelineModel : public QAbstractListModel
 {
     Q_OBJECT
     QML_ELEMENT

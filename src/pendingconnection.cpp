@@ -9,15 +9,27 @@
 
 #include "accounts.h"
 #include "connection.h"
+#include "connection_p.h"
 #include "dispatcher.h"
 #include "utils.h"
 
 using namespace Quotient;
 
-PendingConnection::~PendingConnection() {
+class PendingConnection::Private
+{
+public:
+    RustConnectionWrapper *wrapper = nullptr;
+};
+
+PendingConnection::~PendingConnection()
+{
 }
 
-PendingConnection::PendingConnection() = default;
+PendingConnection::PendingConnection()
+    : QObject()
+    , d(std::make_unique<Private>())
+{
+}
 
 void PendingConnection::setMatrixId(const QString &matrixId)
 {
@@ -28,14 +40,14 @@ Quotient::PendingConnection *PendingConnection::loginWithPassword(const QString 
 {
     auto pendingConnection = new PendingConnection();
     pendingConnection->setMatrixId(matrixId);
-    pendingConnection->wrapper = new RustConnectionWrapper { sdk::init(stringToRust(matrixId), stringToRust(password)) };
+    pendingConnection->d->wrapper = new RustConnectionWrapper{sdk::init(stringToRust(matrixId), stringToRust(password))};
     // TODO: Disconnect this once logged in
     connect(Dispatcher::instance(), &Dispatcher::connected, pendingConnection, [pendingConnection](const QString &matrixId) {
         if (matrixId != pendingConnection->m_matrixId) {
             return;
         }
 
-        const auto data = (*pendingConnection->wrapper->m_connection)->session();
+        const auto data = (*pendingConnection->d->wrapper->m_connection)->session();
 
         auto job = new QKeychain::WritePasswordJob(qAppName());
         job->setKey(matrixId);
@@ -46,7 +58,7 @@ Quotient::PendingConnection *PendingConnection::loginWithPassword(const QString 
         connect(job, &QKeychain::WritePasswordJob::finished, pendingConnection, [pendingConnection](const auto &job) {
             if (job->error() != QKeychain::NoError) {
                 qWarning() << "Failed to write to keychain" << job->error();
-                //TODO error the entire pendingConnection;
+                // TODO error the entire pendingConnection;
                 return;
             }
             pendingConnection->m_ready = true;
@@ -68,12 +80,12 @@ Quotient::PendingConnection *PendingConnection::loadAccount(const QString &matri
     job->start();
     connect(job, &QKeychain::Job::finished, pendingConnection, [job, pendingConnection]() {
         if (job->error() != QKeychain::NoError) {
-            //TODO error entirely here
+            // TODO error entirely here
             qWarning() << "Failed to read from keychain" << job->error();
             return;
         }
         const auto data = job->binaryData();
-        pendingConnection->wrapper = new RustConnectionWrapper { sdk::restore(rust::String(data.data(), data.size())) };
+        pendingConnection->d->wrapper = new RustConnectionWrapper{sdk::restore(rust::String(data.data(), data.size()))};
         connect(Dispatcher::instance(), &Dispatcher::connected, pendingConnection, [pendingConnection](const QString &) {
             pendingConnection->m_ready = true;
             Q_EMIT pendingConnection->ready();
@@ -88,9 +100,9 @@ Quotient::Connection *PendingConnection::connection()
     if (!m_ready) {
         return {};
     }
-    auto connection = new Connection(wrapper);
+    auto connection = new Connection(std::make_unique<Connection::Private>(d->wrapper));
     m_accounts->newConnection(connection);
-    wrapper = nullptr;
+    d->wrapper = nullptr;
     return connection;
 }
 

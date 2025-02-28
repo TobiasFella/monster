@@ -5,9 +5,11 @@
 
 #include <QQuickAsyncImageProvider>
 
-#include "connection.h"
+#include <QuotientNg/Connection>
 
-class RoomAvatarImageProvider : public QQuickAsyncImageProvider
+#include "quotient_export.h"
+
+class QUOTIENT_EXPORT RoomAvatarImageProvider : public QQuickAsyncImageProvider
 {
     Q_OBJECT
     QML_ELEMENT

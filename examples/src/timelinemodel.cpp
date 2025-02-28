@@ -3,11 +3,15 @@
 
 #include "timelinemodel.h"
 
-#include "dispatcher.h"
-#include "lib.rs.h"
-#include "utils.h"
+#include <QuotientNg/Dispatcher>
+#include <QuotientNg/lib.rs.h>
+#include <QuotientNg/Room>
+#include <QuotientNg/Connection>
+#include <QuotientNg/Utils>
 
-#include "connection.h"
+#include <QuotientNg/Connection_p>
+
+#include <QPointer>
 
 using namespace Quotient;
 
@@ -40,13 +44,13 @@ TimelineModel::TimelineModel(QObject *parent)
 {
     connect(this, &TimelineModel::roomChanged, this, [this]() {
         if (d->connection) {
-            d->timeline = d->connection->connection()->timeline(stringToRust(room()->id()));
+            d->timeline = d->connection->d->connection()->timeline(stringToRust(room()->id()));
         }
     });
 
     connect(this, &TimelineModel::connectionChanged, this, [this]() {
         if (d->room) {
-            d->timeline = d->connection->connection()->timeline(stringToRust(room()->id()));
+            d->timeline = d->connection->d->connection()->timeline(stringToRust(room()->id()));
         }
     });
     connect(Dispatcher::instance(),
@@ -220,7 +224,7 @@ bool TimelineModel::canFetchMore(const QModelIndex &) const
 void TimelineModel::fetchMore(const QModelIndex &)
 {
     if (room()) {
-        d->connection->connection()->timeline_paginate_back(**d->timeline);
+        d->connection->d->connection()->timeline_paginate_back(**d->timeline);
     }
 }
 
@@ -237,5 +241,5 @@ bool ReversedTimelineModel::lessThan(const QModelIndex &sourceLeft, const QModel
 
 void TimelineModel::sendMessage(const QString &message)
 {
-    (*d->timeline)->send_message(*d->connection->connection(), stringToRust(message));
+    (*d->timeline)->send_message(*d->connection->d->connection(), stringToRust(message));
 }

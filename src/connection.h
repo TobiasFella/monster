@@ -4,22 +4,17 @@
 #pragma once
 
 #include <QObject>
-#include <QQmlEngine>
-#include <qqmlintegration.h>
+#include <QtQmlIntegration/qqmlintegration.h>
 
-#include "lib.rs.h"
 #include "room.h"
+
+#include "quotient_export.h"
 
 namespace Quotient
 {
 class RoomStream;
 
-struct RustConnectionWrapper
-{
-    std::optional<rust::Box<sdk::Connection>> m_connection;
-};
-
-class Connection : public QObject
+class QUOTIENT_EXPORT Connection : public QObject
 {
     Q_OBJECT
     QML_ELEMENT
@@ -28,7 +23,6 @@ class Connection : public QObject
 public:
     ~Connection();
 
-    rust::Box<sdk::Connection> &connection() const;
     QString matrixId() const;
 
     Q_INVOKABLE void open(const QString &roomId);
@@ -45,18 +39,19 @@ public:
      */
     std::unique_ptr<RoomStream> roomStream();
 
+    void roomAvatar(const QString &roomId);
+
+    class Private;
+    std::unique_ptr<Private> d;
 Q_SIGNALS:
     void avatarLoaded(const QString &roomId, const QByteArray &data);
     void openRoom(Room *room);
     void loggedOut();
 
 private:
-    class Private;
-    std::unique_ptr<Private> d;
     friend class PendingConnection;
 
-    Connection(RustConnectionWrapper *wrapper);
-
+    Connection(std::unique_ptr<Private> d);
     static Connection *loginWithPassword(const QString &matrixId, const QString &password);
     static Connection *loadAccount(const QString &matrixId);
 };

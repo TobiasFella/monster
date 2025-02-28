@@ -4,8 +4,7 @@
 #pragma once
 
 #include <QAbstractListModel>
-#include <QQmlEngine>
-#include <qqmlintegration.h>
+#include <QtQmlIntegration/qqmlintegration.h>
 
 namespace Quotient
 {

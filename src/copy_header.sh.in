@@ -1,0 +1,2 @@
+ls -l ${CMAKE_BINARY_DIR}/cargo/build/${Rust_CARGO_TARGET}/cxxbridge/sdk/src/lib.rs.h
+cp $(readlink -f ${CMAKE_BINARY_DIR}/cargo/build/${Rust_CARGO_TARGET}/cxxbridge/sdk/src/lib.rs.h) ${CMAKE_BINARY_DIR}

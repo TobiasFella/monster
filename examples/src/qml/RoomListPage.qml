@@ -10,22 +10,22 @@ import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 import org.kde.kirigamiaddons.formcard as FormCard
 
-import im.arctic.monster
+import org.kde.quotient.demo
 
 Kirigami.ScrollablePage {
     id: root
 
-    title: i18nc("@title", "Rooms")
+    title: qsTr("Rooms")
 
     required property Connection connection
 
     actions: [
         Kirigami.Action {
-            text: i18nc("@action:button", "Log out")
+            text: qsTr("Log out")
             onTriggered: root.connection.logout()
         },
         Kirigami.Action {
-            text: i18nc("@action:button", "Create Room")
+            text: qsTr("Create Room")
             onTriggered: root.connection.createRoom("Hello", "World", "")
         }
     ]

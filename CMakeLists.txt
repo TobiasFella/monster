@@ -3,7 +3,7 @@
 
 cmake_minimum_required(VERSION 3.24)
 
-project(Monster VERSION 0.1.0)
+project(QuotientNg VERSION 0.1.0)
 
 set(KF_MIN_VERSION "6.6")
 set(QT_MIN_VERSION "6.5")
@@ -25,16 +25,58 @@ include(KDECompilerSettings NO_POLICY_SCOPE)
 include(KDEGitCommitHooks)
 include(KDEClangFormat)
 include(ECMQmlModule)
+include(ECMGenerateExportHeader)
+include(ECMGenerateHeaders)
 
-find_package(Qt6 ${QT_MIN_VERSION} REQUIRED NO_MODULE COMPONENTS Core Quick Gui QuickControls2 Svg Widgets)
-find_package(KF6 ${KF_MIN_VERSION} REQUIRED COMPONENTS I18n)
+ecm_setup_version(
+  PROJECT
+  VARIABLE_PREFIX
+  QUOTIENTNG
+  VERSION_HEADER
+  quotient_version.h
+  PACKAGE_VERSION_FILE
+  "${CMAKE_CURRENT_BINARY_DIR}/QuotientNgConfigVersion.cmake"
+  SOVERSION
+  0)
+
+find_package(Qt6 ${QT_MIN_VERSION} REQUIRED NO_MODULE
+             COMPONENTS Core Quick Gui QuickControls2)
 find_package(Corrosion REQUIRED)
 find_package(Qt6Keychain REQUIRED)
 
-# if (QT_KNOWN_POLICY_QTP0004)
-#     qt_policy(SET QTP0004 NEW)
-# endif ()
+set(CMAKECONFIG_INSTALL_DIR "${KDE_INSTALL_CMAKEPACKAGEDIR}/QuotientNg")
+
+configure_package_config_file(
+  "${CMAKE_CURRENT_SOURCE_DIR}/QuotientNgConfig.cmake.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/QuotientNgConfig.cmake"
+  INSTALL_DESTINATION "${CMAKECONFIG_INSTALL_DIR}")
+
+install(
+  FILES "${CMAKE_CURRENT_BINARY_DIR}/QuotientNgConfig.cmake"
+        "${CMAKE_CURRENT_BINARY_DIR}/QuotientNgConfigVersion.cmake"
+  DESTINATION "${CMAKECONFIG_INSTALL_DIR}"
+  COMPONENT Devel)
+
+install(
+  EXPORT QuotientNgTargets
+  DESTINATION "${CMAKECONFIG_INSTALL_DIR}"
+  FILE QuotientNgTargets.cmake)
+
+install(
+  FILES ${CMAKE_CURRENT_BINARY_DIR}/quotient_version.h
+  DESTINATION ${KDE_INSTALL_INCLUDEDIR}
+  COMPONENT Devel)
+
+if(QT_KNOWN_POLICY_QTP0004)
+  qt_policy(SET QTP0004 NEW)
+endif()
 
 corrosion_import_crate(MANIFEST_PATH src/sdk/Cargo.toml)
 
+install(TARGETS sdk EXPORT QuotientNgTargets)
+
 add_subdirectory(src)
+
+file(GLOB_RECURSE ALL_CLANG_FORMAT_SOURCE_FILES src/*.cpp src/*.h)
+kde_clang_format(${ALL_CLANG_FORMAT_SOURCE_FILES})
+kde_configure_git_pre_commit_hook(CHECKS CLANG_FORMAT)

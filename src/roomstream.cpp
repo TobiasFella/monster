@@ -5,7 +5,7 @@
 
 #include "connection.h"
 #include "dispatcher.h"
-#include <qnamespace.h>
+#include "connection_p.h"
 
 using namespace Quotient;
 
@@ -48,7 +48,7 @@ bool RoomStream::startStream()
     if (connection == nullptr) {
         return false;
     }
-    d->rooms = connection->connection()->slide();
+    connection->d->connection()->slide();
     return true;
 }
 

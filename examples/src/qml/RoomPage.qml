@@ -8,7 +8,7 @@ import QtQuick.Controls as QQC2
 
 import org.kde.kirigami as Kirigami
 
-import im.arctic.monster
+import org.kde.quotient.demo
 
 Kirigami.Page {
     id: root

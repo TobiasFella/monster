@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: 2025 Tobias Fella <tobias.fella@kde.org>
+# SPDX-License-Identifier: BSD-2-Clause
+
+include(CMakeFindDependencyMacro)
+
+find_dependency(Qt6Gui)
+find_dependency(Qt6Network)
+find_dependency(Qt6Keychain)
+
+include("${CMAKE_CURRENT_LIST_DIR}/QuotientNgTargets.cmake")

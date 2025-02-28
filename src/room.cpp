@@ -3,23 +3,10 @@
 
 #include "room.h"
 
+#include "room_p.h"
 #include "utils.h"
 
 using namespace Quotient;
-
-struct RustRoomWrapper
-{
-    std::optional<rust::Box<sdk::Room>> room;
-};
-
-class Room::Private
-{
-public:
-    ~Private() {
-        delete wrapper;
-    }
-    RustRoomWrapper *wrapper = nullptr;
-};
 
 QString Room::displayName() const
 {
@@ -33,8 +20,8 @@ QString Room::id() const
 
 Room::~Room() = default;
 
-Room::Room(rust::Box<sdk::Room> room, QObject *parent)
+Room::Room(std::unique_ptr<Private> d, QObject *parent)
     : QObject(parent)
-    , d(std::make_unique<Private>(new RustRoomWrapper(std::move(room))))
+    , d(std::move(d))
 {
 }

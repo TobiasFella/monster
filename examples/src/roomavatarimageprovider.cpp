@@ -3,9 +3,9 @@
 
 #include "roomavatarimageprovider.h"
 
-#include "connection.h"
-#include "dispatcher.h"
-#include "utils.h"
+#include <QuotientNg/Dispatcher>
+#include <QuotientNg/Utils>
+#include <QuotientNg/Connection_p>
 
 using namespace Quotient;
 
@@ -18,7 +18,7 @@ QQuickImageResponse *RoomAvatarImageProvider::requestImageResponse(const QString
 
 RoomAvatarImageResponse::RoomAvatarImageResponse(const QString &id, const QSize &, Connection *connection)
 {
-    connection->connection()->room_avatar(stringToRust(id));
+    connection->d->connection()->room_avatar(stringToRust(id));
     connect(Dispatcher::instance(), &Dispatcher::avatarLoaded, this, [id, this](const auto &roomId, const QByteArray &data) {
         if (id != roomId) {
             return;

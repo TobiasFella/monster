@@ -10,7 +10,7 @@ import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 import org.kde.kirigamiaddons.formcard as FormCard
 
-import im.arctic.monster
+import org.kde.quotient.demo
 
 Kirigami.ApplicationWindow {
     id: root
@@ -18,7 +18,7 @@ Kirigami.ApplicationWindow {
     width: 800
     height: 600
 
-    title: i18nc("@title:window", "Monster")
+    title: qsTr("Monster")
 
     Accounts {
         id: accounts
@@ -40,22 +40,22 @@ Kirigami.ApplicationWindow {
     }
 
     pageStack.initialPage: FormCard.FormCardPage {
-        title: i18nc("@title", "Login")
+        title: qsTr("Login")
         FormCard.FormHeader {
-            title: i18nc("@title", "Login")
+            title: qsTr("Login")
         }
         FormCard.FormCard {
             FormCard.FormTextFieldDelegate {
                 id: matrixIdField
-                label: i18nc("@action:textfield", "Matrix Id")
+                label: qsTr("Matrix Id")
             }
             FormCard.FormTextFieldDelegate {
                 id: passwordField
-                label: i18nc("@action:textfield", "Password")
+                label: qsTr("Password")
                 echoMode: QQC2.TextField.Password
             }
             FormCard.FormButtonDelegate {
-                text: i18nc("@action:button", "Login")
+                text: qsTr("Login")
                 onClicked: pendingConnections.target = accounts.loginWithPassword(matrixIdField.text, passwordField.text)
             }
         }
