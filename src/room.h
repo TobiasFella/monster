@@ -9,10 +9,12 @@
 
 #include "lib.rs.h"
 
+#include "quotient_export.h"
+
 namespace Quotient
 {
 
-class Room : public QObject
+class QUOTIENT_API Room : public QObject
 {
     Q_OBJECT
     QML_ELEMENT

@@ -1,0 +1,14 @@
+include(CMakeFindDependencyMacro)
+
+find_dependency(Qt6Gui)
+find_dependency(Qt6Network)
+find_dependency(Qt6Keychain)
+find_dependency(OpenSSL)
+
+include("${CMAKE_CURRENT_LIST_DIR}/QuotientNgTargets.cmake")
+
+if (NOT QUOTIENT_FORCE_NAMESPACED_INCLUDES)
+    get_target_property(_include_dir QuotientNg INTERFACE_INCLUDE_DIRECTORIES)
+    list(APPEND _include_dir "${_include_dir}/Quotient")
+    set_target_properties(QuotientNg PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${_include_dir}")
+endif()

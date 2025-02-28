@@ -10,12 +10,14 @@
 
 #include "room.h"
 
+#include "quotient_export.h"
+
 namespace Quotient
 {
 class Connection;
 };
 
-class TimelineModel : public QAbstractListModel
+class QUOTIENT_API TimelineModel : public QAbstractListModel
 {
     Q_OBJECT
     QML_ELEMENT
