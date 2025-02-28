@@ -3,7 +3,7 @@
 
 cmake_minimum_required(VERSION 3.24)
 
-project(Monster VERSION 0.1.0)
+project(QuotientNg VERSION 0.1.0)
 
 set(KF_MIN_VERSION "6.6")
 set(QT_MIN_VERSION "6.5")
@@ -31,10 +31,12 @@ find_package(KF6 ${KF_MIN_VERSION} REQUIRED COMPONENTS I18n)
 find_package(Corrosion REQUIRED)
 find_package(Qt6Keychain REQUIRED)
 
-# if (QT_KNOWN_POLICY_QTP0004)
-#     qt_policy(SET QTP0004 NEW)
-# endif ()
+if (QT_KNOWN_POLICY_QTP0004)
+    qt_policy(SET QTP0004 NEW)
+endif ()
 
 corrosion_import_crate(MANIFEST_PATH src/sdk/Cargo.toml)
+
+install(TARGETS sdk EXPORT QuotientNgTargets)
 
 add_subdirectory(src)

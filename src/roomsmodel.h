@@ -7,12 +7,14 @@
 #include <QQmlEngine>
 #include <qqmlintegration.h>
 
+#include "quotient_export.h"
+
 namespace Quotient
 {
 class Connection;
 }
 
-class RoomsModel : public QAbstractListModel
+class QUOTIENT_API RoomsModel : public QAbstractListModel
 {
     Q_OBJECT
     QML_ELEMENT

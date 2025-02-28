@@ -7,7 +7,9 @@
 
 #include "connection.h"
 
-class RoomAvatarImageProvider : public QQuickAsyncImageProvider
+#include "quotient_export.h"
+
+class QUOTIENT_API RoomAvatarImageProvider : public QQuickAsyncImageProvider
 {
     Q_OBJECT
     QML_ELEMENT

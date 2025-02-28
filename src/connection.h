@@ -7,8 +7,10 @@
 #include <QQmlEngine>
 #include <qqmlintegration.h>
 
-#include "lib.rs.h"
+#include <lib.rs.h>
 #include "room.h"
+
+#include "quotient_export.h"
 
 namespace Quotient
 {
@@ -19,7 +21,7 @@ struct RustConnectionWrapper
     std::optional<rust::Box<sdk::Connection>> m_connection;
 };
 
-class Connection : public QObject
+class QUOTIENT_API  Connection : public QObject
 {
     Q_OBJECT
     QML_ELEMENT

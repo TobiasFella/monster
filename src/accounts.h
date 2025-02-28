@@ -9,11 +9,13 @@
 
 #include "pendingconnection.h"
 
+#include "quotient_export.h"
+
 namespace Quotient
 {
 class Connection;
 
-class Accounts : public QObject
+class QUOTIENT_API Accounts : public QObject
 {
     Q_OBJECT
     QML_ELEMENT
