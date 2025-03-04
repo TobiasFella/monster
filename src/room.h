@@ -31,8 +31,8 @@ public:
     bool isTombstoned() const;
     rust::Box<sdk::RoomTombstoneEventContent> tombstone() const;
     QString topic() const;
-    rust::u64 numUnreadMessages() const;
-    rust::u64 numUnreadMentions() const;
+    int numUnreadMessages() const;
+    int numUnreadMentions() const;
     bool isFavourite() const;
     bool isLowPriority() const;
 

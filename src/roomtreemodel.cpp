@@ -17,12 +17,6 @@ using namespace Quotient;
 class RoomTreeModel::Private
 {
 public:
-    enum AddAction {
-        Front,
-        Back,
-
-    };
-
     QPointer<Quotient::Connection> connection;
     std::unique_ptr<RoomStream> roomStream = nullptr;
     std::unique_ptr<RoomTreeItem> rootItem;
@@ -40,8 +34,6 @@ RoomTreeModel::RoomTreeModel(QObject *parent)
     : QAbstractItemModel(parent)
     , d(std::make_unique<Private>())
 {
-    // See "Accessing the Public Class" section in
-    // https://marcmutz.wordpress.com/translated-articles/pimp-my-pimpl-%E2%80%94-reloaded/
     d->q = this;
 }
 

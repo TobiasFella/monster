@@ -41,8 +41,6 @@ RoomsModel::RoomsModel(QObject *parent)
     : QAbstractListModel(parent)
     , d(std::make_unique<Private>())
 {
-    // See "Accessing the Public Class" section in
-    // https://marcmutz.wordpress.com/translated-articles/pimp-my-pimpl-%E2%80%94-reloaded/
     d->q = this;
 }
 

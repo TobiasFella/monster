@@ -61,12 +61,12 @@ QString Room::topic() const
     return stringFromRust((*d->wrapper->room)->topic());
 }
 
-rust::u64 Room::numUnreadMessages() const
+int Room::numUnreadMessages() const
 {
     return (*d->wrapper->room)->num_unread_messages();
 }
 
-rust::u64 Room::numUnreadMentions() const
+int Room::numUnreadMentions() const
 {
     return (*d->wrapper->room)->num_unread_mentions();
 }
