@@ -8,6 +8,7 @@
 #include <qqmlintegration.h>
 
 #include "lib.rs.h"
+#include "rust/cxx.h"
 
 namespace Quotient
 {
@@ -22,8 +23,18 @@ class Room : public QObject
     Q_PROPERTY(QString id READ id CONSTANT)
 
 public:
-    QString displayName() const;
     QString id() const;
+    rust::u8 state() const;
+    bool isSpace() const;
+    QString roomType() const;
+    QString displayName() const;
+    bool isTombstoned() const;
+    rust::Box<sdk::RoomTombstoneEventContent> tombstone() const;
+    QString topic() const;
+    int numUnreadMessages() const;
+    int numUnreadMentions() const;
+    bool isFavourite() const;
+    bool isLowPriority() const;
 
     ~Room();
 

@@ -26,8 +26,6 @@ RoomStream::RoomStream(Quotient::Connection *connection)
 {
     Q_ASSERT(connection);
 
-    // See "Accessing the Public Class" section in
-    // https://marcmutz.wordpress.com/translated-articles/pimp-my-pimpl-%E2%80%94-reloaded/
     d->q = this;
 
     d->matrixId = connection->matrixId();

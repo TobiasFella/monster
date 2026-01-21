@@ -20,6 +20,14 @@ use std::sync::{Arc, RwLock};
 use tokio::runtime::Runtime;
 use tokio_stream::StreamExt;
 
+use crate::tombstone::RoomTombstoneEventContent;
+use crate::room::Room;
+use crate::roomlistroom::RoomListRoom;
+
+mod tombstone;
+mod room;
+mod roomlistroom;
+
 struct Connection {
     rt: Runtime,
     client: Client,
@@ -28,22 +36,6 @@ struct Connection {
 struct Rooms {
     queue: Arc<RwLock<Vec<VectorDiff<matrix_sdk_ui::room_list_service::Room>>>>,
 }
-
-impl Room {
-    fn display_name(&self) -> String {
-        self.room.name().unwrap_or("This room does not have a name".to_string())
-    }
-
-    fn id(&self) -> String {
-        self.room.room_id().to_string()
-    }
-}
-
-struct Room {
-    room: matrix_sdk::room::Room,
-}
-
-struct RoomListRoom(matrix_sdk_ui::room_list_service::Room);
 
 struct RoomListVecDiff(VectorDiff<matrix_sdk_ui::room_list_service::Room>);
 
@@ -117,21 +109,6 @@ impl RoomListVecDiff {
 //         })
 //     }
 // }
-
-impl RoomListRoom {
-    fn id(&self) -> String {
-        self.0.id().to_string()
-    }
-    fn display_name(&self) -> String {
-        self.0
-            .cached_display_name()
-            .unwrap_or("No name available :(".to_string())
-    }
-
-    fn box_me(&self) -> Box<RoomListRoom> {
-        Box::new(RoomListRoom(self.0.clone()))
-    }
-}
 
 /* There's two different types of RwLock in here!
  * Timeline.0 uses std::sync::RwLock, since this isn't async, which makes it easier to call from C++
@@ -538,6 +515,7 @@ fn restore(secret: String) -> Box<Connection> {
 mod ffi {
     #[namespace = "sdk"]
     extern "Rust" {
+        type RoomTombstoneEventContent;
         type Connection;
         type RoomListRoom;
         type TimelineItem;
@@ -547,6 +525,9 @@ mod ffi {
         type RoomListVecDiff;
         type RoomCreateOptions;
         type Room;
+
+        pub fn body(self :&RoomTombstoneEventContent) -> String;
+        pub fn replacement_room(self :&RoomTombstoneEventContent) -> String;
 
         fn init(matrix_id: String, password: String) -> Box<Connection>;
         fn restore(secret: String) -> Box<Connection>;
@@ -562,7 +543,18 @@ mod ffi {
         fn room(self: &Connection, id: String) -> Box<Room>;
 
         fn id(self: &RoomListRoom) -> String;
+        fn state(self: &RoomListRoom) -> u8;
+        fn is_space(self: &RoomListRoom) -> bool;
+        fn room_type(self: &RoomListRoom) -> String;
         fn display_name(self: &RoomListRoom) -> String;
+        fn is_tombstoned(self: &RoomListRoom) -> bool;
+        fn tombstone(self: &RoomListRoom) -> Box<RoomTombstoneEventContent>;
+        fn topic(self: &RoomListRoom) -> String;
+        fn num_unread_messages(self: &RoomListRoom) -> u64;
+        fn num_unread_mentions(self: &RoomListRoom) -> u64;
+        fn canonical_alias(self: &RoomListRoom) -> String;
+        fn is_favourite(self: &RoomListRoom) -> bool;
+        fn is_low_priority(self: &RoomListRoom) -> bool;
         fn box_me(self: &RoomListRoom) -> Box<RoomListRoom>;
 
         fn id(self: &TimelineItem) -> String;
@@ -594,8 +586,18 @@ mod ffi {
         fn set_topic(self: &mut RoomCreateOptions, topic: String);
         fn set_visibility_public(self: &mut RoomCreateOptions, visibility_public: bool);
 
-        fn display_name(self: &Room) -> String;
         fn id(self: &Room) -> String;
+        fn state(self: &Room) -> u8;
+        fn is_space(self: &Room) -> bool;
+        fn room_type(self: &Room) -> String;
+        fn display_name(self: &Room) -> String;
+        fn is_tombstoned(self: &Room) -> bool;
+        fn tombstone(self: &Room) -> Box<RoomTombstoneEventContent>;
+        fn topic(self: &Room) -> String;
+        fn num_unread_messages(self: &Room) -> u64;
+        fn num_unread_mentions(self: &Room) -> u64;
+        fn is_favourite(self: &Room) -> bool;
+        fn is_low_priority(self: &Room) -> bool;
     }
 
     unsafe extern "C++" {
