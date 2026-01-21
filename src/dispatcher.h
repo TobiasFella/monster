@@ -28,6 +28,7 @@ Q_SIGNALS:
     void roomsUpdate(const QString &matrixId);
     void timelineUpdate(const QString &matrix_id, const QString &room_id);
     void loggedOut(const QString &matrixId);
+    void oidcLoginUrlAvailable(const QString &serverName, const QString &url);
 
 private:
     Dispatcher();

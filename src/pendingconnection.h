@@ -19,9 +19,6 @@ class PendingConnection : public QObject
     QML_UNCREATABLE("")
 
 public:
-    Q_INVOKABLE static Quotient::PendingConnection *loginWithPassword(const QString &matrixId, const QString &password, Accounts *accounts);
-    Q_INVOKABLE static Quotient::PendingConnection *loadAccount(const QString &matrixId, Accounts *accounts);
-
     /**
      * @brief Get the connection for this PendingConnection.
      *
@@ -31,14 +28,19 @@ public:
     Q_INVOKABLE Quotient::Connection *connection();
 
     QString matrixId() const;
-    ~PendingConnection();
+    ~PendingConnection() override;
 
 Q_SIGNALS:
     void ready();
 
 private:
+    friend class Accounts;
     PendingConnection();
     void setMatrixId(const QString &matrixId);
+
+    static Quotient::PendingConnection *loginWithPassword(const QString &matrixId, const QString &password, Accounts *accounts);
+    static Quotient::PendingConnection *loadAccount(const QString &matrixId, Accounts *accounts);
+    static Quotient::PendingConnection *loginWithOidc(const QString &serverName, Accounts *accounts);
 
     //TODO: Make this an error enum instead
     bool m_ready = false;

@@ -57,7 +57,7 @@ Quotient::PendingConnection *PendingConnection::loginWithPassword(const QString 
     return pendingConnection;
 }
 
-Quotient::PendingConnection *PendingConnection::loadAccount(const QString &matrixId, Accounts *accounts)
+PendingConnection *PendingConnection::loadAccount(const QString &matrixId, Accounts *accounts)
 {
     auto pendingConnection = new PendingConnection();
     pendingConnection->setMatrixId(matrixId);
@@ -83,7 +83,47 @@ Quotient::PendingConnection *PendingConnection::loadAccount(const QString &matri
     return pendingConnection;
 }
 
-Quotient::Connection *PendingConnection::connection()
+PendingConnection *PendingConnection::loginWithOidc(const QString &serverName, Accounts *accounts)
+{
+    const auto pendingConnection = new PendingConnection();
+    pendingConnection->wrapper = new RustConnectionWrapper { sdk::init_oidc(stringToRust(serverName)) };
+    //TODO connectuntil
+    connect(Dispatcher::instance(), &Dispatcher::oidcLoginUrlAvailable, pendingConnection, [serverName](const auto &server, const auto &url) {
+        if (server != serverName) {
+            return;
+        }
+        qWarning() << "open" << url;
+    });
+    //TODO: Deduplicate
+    connect(Dispatcher::instance(), &Dispatcher::connected, pendingConnection, [pendingConnection, serverName](const QString &matrixId) {
+        // NOTE: this is not a matrix id, but for simplicity, we just use the same function
+        if (matrixId != serverName) {
+            return;
+        }
+
+        const auto data = (*pendingConnection->wrapper->m_connection)->session();
+
+        const auto job = new QKeychain::WritePasswordJob(qAppName());
+        job->setKey(matrixId);
+        job->setBinaryData({data.data(), (int)data.size()});
+        job->setAutoDelete(true);
+        job->start();
+
+        connect(job, &QKeychain::WritePasswordJob::finished, pendingConnection, [pendingConnection](const auto &job) {
+            if (job->error() != QKeychain::NoError) {
+                qWarning() << "Failed to write to keychain" << job->error();
+                //TODO error the entire pendingConnection;
+                return;
+            }
+            pendingConnection->m_ready = true;
+            Q_EMIT pendingConnection->ready();
+        });
+    });
+    pendingConnection->m_accounts = accounts;
+    return pendingConnection;
+}
+
+Connection *PendingConnection::connection()
 {
     if (!m_ready) {
         return {};

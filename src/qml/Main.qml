@@ -45,18 +45,22 @@ Kirigami.ApplicationWindow {
             title: i18nc("@title", "Login")
         }
         FormCard.FormCard {
+            // FormCard.FormTextFieldDelegate {
+            //     id: matrixIdField
+            //     label: i18nc("@action:textfield", "Matrix Id")
+            // }
+            // FormCard.FormTextFieldDelegate {
+            //     id: passwordField
+            //     label: i18nc("@action:textfield", "Password")
+            //     echoMode: QQC2.TextField.Password
+            // }
             FormCard.FormTextFieldDelegate {
-                id: matrixIdField
-                label: i18nc("@action:textfield", "Matrix Id")
-            }
-            FormCard.FormTextFieldDelegate {
-                id: passwordField
-                label: i18nc("@action:textfield", "Password")
-                echoMode: QQC2.TextField.Password
+                id: serverNameField
+                label: i18nc("@action:textfield", "Server address")
             }
             FormCard.FormButtonDelegate {
                 text: i18nc("@action:button", "Login")
-                onClicked: pendingConnections.target = accounts.loginWithPassword(matrixIdField.text, passwordField.text)
+                onClicked: pendingConnections.target = accounts.loginWithOidc(serverNameField.text)
             }
         }
         FormCard.FormCard {

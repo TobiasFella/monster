@@ -31,6 +31,11 @@ void shim_logged_out(rust::String matrixId)
     Q_EMIT Dispatcher::instance()->loggedOut(stringFromRust(matrixId));
 }
 
+void shim_oidc_login_url_available(rust::String serverName, rust::String url)
+{
+    Q_EMIT Dispatcher::instance()->oidcLoginUrlAvailable(stringFromRust(serverName), stringFromRust(url));
+}
+
 Dispatcher::Dispatcher()
     : QObject(nullptr)
 {

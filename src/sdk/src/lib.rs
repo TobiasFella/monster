@@ -2,43 +2,45 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 use chrono::prelude::{DateTime, Utc};
+use matrix_sdk::authentication::oauth::registration::{
+    ApplicationType, ClientMetadata, Localized, OAuthGrantType,
+};
+use matrix_sdk::authentication::oauth::{ClientRegistrationData, UrlOrQuery};
+use matrix_sdk::reqwest::Url;
+use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::{
+    authentication::matrix::MatrixSession,
     media::MediaFormat,
     ruma::{
-        RoomId,
-        UserId,
+        api::client::{error::StandardErrorBody, room::Visibility},
         events::{
+            room::message::{MessageType, RoomMessageEventContent, TextMessageEventContent},
             AnyMessageLikeEventContent,
-            room::message::{
-                MessageType, RoomMessageEventContent, TextMessageEventContent,
-            }
         },
-        api::{
-            client::{
-                room::Visibility,
-                error::StandardErrorBody
-            }
-        }
+        RoomId, UserId,
     },
     Client,
-    authentication::matrix::MatrixSession,
 };
 use matrix_sdk_ui::{
     eyeball_im::VectorDiff,
     sync_service::SyncService,
-    timeline::{MsgLikeKind, TimelineBuilder, TimelineItemContent, TimelineItemKind, VirtualTimelineItem}
+    timeline::{
+        MsgLikeKind, TimelineBuilder, TimelineItemContent, TimelineItemKind, VirtualTimelineItem,
+    },
 };
 use std::sync::{Arc, RwLock};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::net::TcpSocket;
 use tokio::runtime::Runtime;
 use tokio_stream::StreamExt;
 
-use crate::tombstone::RoomTombstoneEventContent;
 use crate::room::Room;
 use crate::roomlistitem::RoomListItem;
+use crate::tombstone::RoomTombstoneEventContent;
 
-mod tombstone;
 mod room;
 mod roomlistitem;
+mod tombstone;
 
 struct Connection {
     rt: Runtime,
@@ -308,7 +310,7 @@ impl Connection {
     }
 
     fn init(matrix_id: String, password: String) -> Box<Connection> {
-        let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
+        let rt = Runtime::new().expect("Failed to create runtime");
         let _ =
             std::fs::remove_dir_all(dirs::state_dir().unwrap().join("monster").join(&matrix_id));
         let client = rt.block_on(async {
@@ -337,6 +339,66 @@ impl Connection {
         Box::new(Connection { rt, client })
     }
 
+    pub(crate) fn init_oidc(server_name: String) -> Box<Connection> {
+        let rt = Runtime::new().expect("Failed to create runtime");
+        let client = rt.block_on(async {
+            Client::builder()
+                .server_name_or_homeserver_url(&server_name)
+                .build()
+                .await
+                .unwrap()
+        });
+        let client_clone = client.clone();
+        rt.spawn(async move {
+            let client = client_clone;
+            let mut client_metadata = ClientMetadata::new(
+                ApplicationType::Native,
+                vec![OAuthGrantType::AuthorizationCode {
+                    redirect_uris: vec![Url::parse("http://localhost").unwrap()],
+                }],
+                Localized::new(Url::parse("https://kde.org").unwrap(), None),
+            );
+            client_metadata.client_name = Some(Localized::new("Monster".to_string(), None));
+            let oauth = client.oauth();
+            let url = oauth
+                .login(
+                    Url::parse("http://localhost:18779").unwrap(),
+                    None,
+                    Some(ClientRegistrationData::new(
+                        Raw::new(&client_metadata).unwrap(),
+                    )),
+                    None,
+                )
+                .build()
+                .await
+                .unwrap()
+                .url
+                .to_string();
+
+            ffi::shim_oidc_login_url_available(server_name.clone(), url);
+
+            let socket = TcpSocket::new_v4().unwrap();
+            socket.bind("0.0.0.0:18779".parse().unwrap()).unwrap();
+
+            let (mut stream, _) = socket.listen(1).unwrap().accept().await.unwrap();
+            let mut data = String::new();
+
+            stream
+                .write_all("HTTP/1.0 200 OK\r\n\r\n".as_bytes())
+                .await
+                .unwrap();
+            BufReader::new(stream).read_line(&mut data).await.unwrap();
+            let query = &data.split(" ").nth(1).unwrap()[2..];
+            oauth
+                .finish_login(UrlOrQuery::Query(query.to_string()))
+                .await
+                .unwrap();
+            ffi::shim_connected(server_name);
+
+        });
+        Box::new(Connection { rt, client })
+    }
+
     fn timeline(&self, room_id: String) -> Box<Timeline> {
         let client = self.client.clone();
         let matrix_id = client
@@ -346,10 +408,7 @@ impl Connection {
         let room_id = RoomId::parse(room_id).unwrap();
         let room = client.get_room(&room_id).unwrap();
         let (timeline, items, stream) = self.rt.block_on(async move {
-            let timeline = TimelineBuilder::new(&room)
-                .build()
-                .await
-                .unwrap();
+            let timeline = TimelineBuilder::new(&room).build().await.unwrap();
             let (items, stream) = timeline.subscribe().await;
             (timeline, items, stream)
         });
@@ -452,20 +511,19 @@ impl Connection {
             use matrix_sdk::HttpError::Api;
             use matrix_sdk::RumaApiError::ClientApi;
             match result {
-                Err(Api(error)) => {
-                    match error.as_ref() {
-                        Server(ClientApi(Error {
-                             status_code: StatusCode::UNAUTHORIZED,
-                             body: ErrorBody::Standard(StandardErrorBody {
+                Err(Api(error)) => match error.as_ref() {
+                    Server(ClientApi(Error {
+                        status_code: StatusCode::UNAUTHORIZED,
+                        body:
+                            ErrorBody::Standard(StandardErrorBody {
                                 kind: ErrorKind::UnknownToken { .. },
                                 ..
-                             }),
-                             ..
-                        })) => {
-                            ffi::shim_logged_out(client.user_id().unwrap().to_string());
-                        }
-                        _ => {}
+                            }),
+                        ..
+                    })) => {
+                        ffi::shim_logged_out(client.user_id().unwrap().to_string());
                     }
+                    _ => {}
                 },
                 Ok(..) => {
                     ffi::shim_logged_out(client.user_id().unwrap().to_string());
@@ -485,7 +543,9 @@ impl Connection {
 
     fn room(&self, id: String) -> Box<Room> {
         let room_id = RoomId::parse(id).unwrap();
-        Box::new(Room { room: self.client.get_room(&room_id).unwrap() })
+        Box::new(Room {
+            room: self.client.get_room(&room_id).unwrap(),
+        })
     }
 }
 
@@ -534,6 +594,10 @@ fn init(matrix_id: String, password: String) -> Box<Connection> {
     Connection::init(matrix_id, password)
 }
 
+fn init_oidc(server_name: String) -> Box<Connection> {
+    Connection::init_oidc(server_name)
+}
+
 fn restore(secret: String) -> Box<Connection> {
     Connection::restore(secret)
 }
@@ -554,10 +618,11 @@ mod ffi {
         type RoomCreateOptions;
         type Room;
 
-        pub fn body(self :&RoomTombstoneEventContent) -> String;
-        pub fn replacement_room(self :&RoomTombstoneEventContent) -> String;
+        pub fn body(self: &RoomTombstoneEventContent) -> String;
+        pub fn replacement_room(self: &RoomTombstoneEventContent) -> String;
 
         fn init(matrix_id: String, password: String) -> Box<Connection>;
+        fn init_oidc(server_name: String) -> Box<Connection>;
         fn restore(secret: String) -> Box<Connection>;
         fn device_id(self: &Connection) -> String;
         fn matrix_id(self: &Connection) -> String;
@@ -636,5 +701,7 @@ mod ffi {
         fn shim_timeline_changed(matrix_id: String, room_id: String);
         fn shim_avatar_loaded(room_id: String, data: Vec<u8>);
         fn shim_logged_out(matrix_id: String);
+
+        fn shim_oidc_login_url_available(server_name: String, url: String);
     }
 }

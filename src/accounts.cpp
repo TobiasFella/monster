@@ -86,3 +86,8 @@ void Accounts::saveAccounts()
     accounts.write(m_allAccounts.join(u'\n').toUtf8());
     accounts.close();
 }
+
+Quotient::PendingConnection *Accounts::loginWithOidc(const QString &serverName)
+{
+    return PendingConnection::loginWithOidc(serverName, this);
+}

@@ -28,6 +28,8 @@ public:
     //! Log in to an account that is not already logged in on the client
     Q_INVOKABLE Quotient::PendingConnection *loginWithPassword(const QString &matrixId, const QString &password);
 
+    Q_INVOKABLE Quotient::PendingConnection *loginWithOidc(const QString &serverName);
+
     //! Load an account that is already logged in (i.e., which is listed in Accounts::availableAccounts)
     Q_INVOKABLE Quotient::PendingConnection *loadAccount(const QString &matrixId);
 
