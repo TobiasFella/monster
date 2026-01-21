@@ -20,6 +20,8 @@ Kirigami.ApplicationWindow {
 
     title: i18nc("@title:window", "Monster")
 
+    property PendingConnection pending
+
     Accounts {
         id: accounts
     }
@@ -28,9 +30,10 @@ Kirigami.ApplicationWindow {
         id: pendingConnections
 
         ignoreUnknownSignals: true
+        target: root.pending
 
         function onReady() {
-            const connection = (target as PendingConnection).connection();
+            const connection = root.pending.connection();
             RoomAvatarImageProvider.connection = connection;
             root.pageStack.pop();
             root.pageStack.push(Qt.createComponent("im.arctic.monster", "RoomListPage"), {
@@ -60,8 +63,16 @@ Kirigami.ApplicationWindow {
             }
             FormCard.FormButtonDelegate {
                 text: i18nc("@action:button", "Login")
-                onClicked: pendingConnections.target = accounts.loginWithOidc(serverNameField.text)
+                onClicked: root.pending = accounts.loginWithOidc(serverNameField.text)
             }
+            FormCard.FormButtonDelegate {
+                visible: root.pending?.oidcLoginUrl?.toString().length > 0
+                text: i18nc("@action:button", "Re-open Login Page")
+                onClicked: Qt.openUrlExternally(root.pending.oidcLoginUrl)
+            }
+        }
+        FormCard.FormHeader {
+            title: i18nc("@title", "Existing Accounts")
         }
         FormCard.FormCard {
             Repeater {

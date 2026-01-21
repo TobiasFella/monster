@@ -39,8 +39,8 @@ Q_SIGNALS:
     void availableAccountsChanged();
 
 private:
-    QStringList m_availableAccounts;
-    QStringList m_allAccounts;
+    QSet<QString> m_availableAccounts;
+    QSet<QString> m_allAccounts;
 
     void loadAccounts();
     void saveAccounts();

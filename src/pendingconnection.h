@@ -17,6 +17,7 @@ class PendingConnection : public QObject
     Q_OBJECT
     QML_ELEMENT
     QML_UNCREATABLE("")
+    Q_PROPERTY(QUrl oidcLoginUrl READ oidcLoginUrl NOTIFY oidcLoginUrlChanged)
 
 public:
     /**
@@ -28,10 +29,12 @@ public:
     Q_INVOKABLE Quotient::Connection *connection();
 
     QString matrixId() const;
+    QUrl oidcLoginUrl() const;
     ~PendingConnection() override;
 
 Q_SIGNALS:
     void ready();
+    void oidcLoginUrlChanged();
 
 private:
     friend class Accounts;
@@ -45,6 +48,7 @@ private:
     //TODO: Make this an error enum instead
     bool m_ready = false;
     QString m_matrixId;
+    QUrl m_oidcLoginUrl;
     RustConnectionWrapper *wrapper = nullptr;
     Quotient::Accounts *m_accounts;
 };

@@ -41,7 +41,7 @@ void Accounts::loadAccounts()
 
 QStringList Accounts::availableAccounts() const
 {
-    return m_availableAccounts;
+    return QList(m_availableAccounts.begin(), m_availableAccounts.end());
 }
 
 Quotient::PendingConnection *Accounts::loginWithPassword(const QString &matrixId, const QString &password)
@@ -63,7 +63,7 @@ Quotient::PendingConnection *Accounts::loadAccount(const QString &matrixId)
 void Accounts::newConnection(Connection *connection)
 {
     connect(connection, &Connection::loggedOut, this, [connection, this](){
-        m_allAccounts.removeAll(connection->matrixId());
+        m_allAccounts.remove(connection->matrixId());
         saveAccounts();
         auto job = new QKeychain::DeletePasswordJob(qAppName());
         job->setKey(connection->matrixId());
@@ -83,7 +83,7 @@ void Accounts::saveAccounts()
     auto file = dir + QDir::separator() + u"Accounts"_s;
     QFile accounts(file);
     accounts.open(QIODevice::WriteOnly);
-    accounts.write(m_allAccounts.join(u'\n').toUtf8());
+    accounts.write(QList(m_allAccounts.begin(), m_allAccounts.end()).join(u'\n').toUtf8());
     accounts.close();
 }
 

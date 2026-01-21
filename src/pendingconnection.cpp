@@ -5,6 +5,8 @@
 
 #include <QCoreApplication>
 
+#include <QDesktopServices>
+#include <QUrl>
 #include <qt6keychain/keychain.h>
 
 #include "accounts.h"
@@ -88,11 +90,13 @@ PendingConnection *PendingConnection::loginWithOidc(const QString &serverName, A
     const auto pendingConnection = new PendingConnection();
     pendingConnection->wrapper = new RustConnectionWrapper { sdk::init_oidc(stringToRust(serverName)) };
     //TODO connectuntil
-    connect(Dispatcher::instance(), &Dispatcher::oidcLoginUrlAvailable, pendingConnection, [serverName](const auto &server, const auto &url) {
+    connect(Dispatcher::instance(), &Dispatcher::oidcLoginUrlAvailable, pendingConnection, [pendingConnection, serverName](const auto &server, const auto &url) {
         if (server != serverName) {
             return;
         }
-        qWarning() << "open" << url;
+        pendingConnection->m_oidcLoginUrl = QUrl(url);
+        Q_EMIT pendingConnection->oidcLoginUrlChanged();
+        QDesktopServices::openUrl(pendingConnection->m_oidcLoginUrl);
     });
     //TODO: Deduplicate
     connect(Dispatcher::instance(), &Dispatcher::connected, pendingConnection, [pendingConnection, serverName](const QString &matrixId) {
@@ -137,4 +141,9 @@ Connection *PendingConnection::connection()
 QString PendingConnection::matrixId() const
 {
     return m_matrixId;
+}
+
+QUrl PendingConnection::oidcLoginUrl() const
+{
+    return m_oidcLoginUrl;
 }
