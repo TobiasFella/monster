@@ -5,12 +5,12 @@
 #include "neochatroomtype.h"
 
 namespace sdk {
-struct RoomListRoom;
+struct RoomListItem;
 }
 
 struct RoomWrapper
 {
-    std::optional<rust::Box<sdk::RoomListRoom>> item;
+    std::optional<rust::Box<sdk::RoomListItem>> item;
 };
 
 /**
@@ -68,7 +68,7 @@ public:
      */
     TreeData data() const;
 
-    std::optional<int> rowForRoom(rust::Box<sdk::RoomListRoom> room) const;
+    std::optional<int> rowForRoom(rust::Box<sdk::RoomListItem> room) const;
 
 private:
     std::vector<std::unique_ptr<RoomTreeItem>> m_children;

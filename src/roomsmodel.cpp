@@ -14,7 +14,7 @@ using namespace Quotient;
 
 struct RoomWrapper
 {
-    std::optional<rust::Box<sdk::RoomListRoom>> item;
+    std::optional<rust::Box<sdk::RoomListItem>> item;
 };
 
 class RoomsModel::Private

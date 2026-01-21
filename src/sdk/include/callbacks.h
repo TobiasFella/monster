@@ -8,7 +8,7 @@
 #include "rust/cxx.h"
 
 namespace sdk {
-class RoomListRoom;
+class RoomListItem;
 }
 
 void shim_connected(rust::String matrixId);

@@ -34,7 +34,7 @@ public:
     };
     Q_ENUM(Type);
 
-    static NeoChatRoomType::Type typeForRoom(rust::Box<sdk::RoomListRoom> room)
+    static NeoChatRoomType::Type typeForRoom(rust::Box<sdk::RoomListItem> room)
     {
         if (room->is_space()) {
             return NeoChatRoomType::Space;

@@ -84,7 +84,7 @@ RoomTreeItem::TreeData RoomTreeItem::data() const
     return m_data;
 }
 
-std::optional<int> RoomTreeItem::rowForRoom(rust::Box<sdk::RoomListRoom> room) const
+std::optional<int> RoomTreeItem::rowForRoom(rust::Box<sdk::RoomListItem> room) const
 {
     Q_ASSERT_X(std::holds_alternative<NeoChatRoomType::Type>(m_data), __FUNCTION__, "rowForRoom only works items for rooms not categories");
 

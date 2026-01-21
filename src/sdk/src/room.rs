@@ -59,10 +59,11 @@ impl Room {
 
     /// Get the `m.room.tombstone` content of this room if there is one.
     pub fn tombstone(&self) -> Box<RoomTombstoneEventContent> {
-        match self.room.tombstone() {
-            None => Box::new(RoomTombstoneEventContent::empty()),
-            Some(inner_content) => Box::new(RoomTombstoneEventContent(Some(inner_content))),
+        if self.room.is_tombstoned() {
+            //TODO: use successor directly
+            //Box::new(RoomTombstoneEventContent(Some(inner_content))),
         }
+        Box::new(RoomTombstoneEventContent::empty())
     }
 
     pub fn topic(&self) -> String {

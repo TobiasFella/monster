@@ -119,27 +119,27 @@ public:
      *
      * @sa Parameter
      */
-    static int compareParameter(Parameter parameter, rust::Box<sdk::RoomListRoom> leftRoom, rust::Box<sdk::RoomListRoom> rightRoom);
+    static int compareParameter(Parameter parameter, rust::Box<sdk::RoomListItem> leftRoom, rust::Box<sdk::RoomListItem> rightRoom);
 
 private:
     template<Parameter parameter>
-    static int compareParameter(rust::Box<sdk::RoomListRoom> , rust::Box<sdk::RoomListRoom> )
+    static int compareParameter(rust::Box<sdk::RoomListItem> , rust::Box<sdk::RoomListItem> )
     {
         return false;
     }
 };
 
 template<>
-int RoomSortParameter::compareParameter<RoomSortParameter::AlphabeticalAscending>(rust::Box<sdk::RoomListRoom> leftRoom, rust::Box<sdk::RoomListRoom> rightRoom);
+int RoomSortParameter::compareParameter<RoomSortParameter::AlphabeticalAscending>(rust::Box<sdk::RoomListItem> leftRoom, rust::Box<sdk::RoomListItem> rightRoom);
 template<>
-int RoomSortParameter::compareParameter<RoomSortParameter::AlphabeticalDescending>(rust::Box<sdk::RoomListRoom> leftRoom, rust::Box<sdk::RoomListRoom> rightRoom);
+int RoomSortParameter::compareParameter<RoomSortParameter::AlphabeticalDescending>(rust::Box<sdk::RoomListItem> leftRoom, rust::Box<sdk::RoomListItem> rightRoom);
 template<>
-int RoomSortParameter::compareParameter<RoomSortParameter::HasUnread>(rust::Box<sdk::RoomListRoom> leftRoom, rust::Box<sdk::RoomListRoom> rightRoom);
+int RoomSortParameter::compareParameter<RoomSortParameter::HasUnread>(rust::Box<sdk::RoomListItem> leftRoom, rust::Box<sdk::RoomListItem> rightRoom);
 template<>
-int RoomSortParameter::compareParameter<RoomSortParameter::MostUnread>(rust::Box<sdk::RoomListRoom> leftRoom, rust::Box<sdk::RoomListRoom> rightRoom);
+int RoomSortParameter::compareParameter<RoomSortParameter::MostUnread>(rust::Box<sdk::RoomListItem> leftRoom, rust::Box<sdk::RoomListItem> rightRoom);
 template<>
-int RoomSortParameter::compareParameter<RoomSortParameter::HasHighlight>(rust::Box<sdk::RoomListRoom> leftRoom, rust::Box<sdk::RoomListRoom> rightRoom);
+int RoomSortParameter::compareParameter<RoomSortParameter::HasHighlight>(rust::Box<sdk::RoomListItem> leftRoom, rust::Box<sdk::RoomListItem> rightRoom);
 template<>
-int RoomSortParameter::compareParameter<RoomSortParameter::MostHighlights>(rust::Box<sdk::RoomListRoom> leftRoom, rust::Box<sdk::RoomListRoom> rightRoom);
+int RoomSortParameter::compareParameter<RoomSortParameter::MostHighlights>(rust::Box<sdk::RoomListItem> leftRoom, rust::Box<sdk::RoomListItem> rightRoom);
 template<>
-int RoomSortParameter::compareParameter<RoomSortParameter::LastActive>(rust::Box<sdk::RoomListRoom> leftRoom, rust::Box<sdk::RoomListRoom> rightRoom);
+int RoomSortParameter::compareParameter<RoomSortParameter::LastActive>(rust::Box<sdk::RoomListItem> leftRoom, rust::Box<sdk::RoomListItem> rightRoom);

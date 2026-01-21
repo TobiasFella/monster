@@ -6,11 +6,11 @@ use matrix_sdk::ruma::room::RoomType;
 
 use crate::tombstone::RoomTombstoneEventContent;
 
-pub struct RoomListRoom(pub matrix_sdk_ui::room_list_service::Room);
+pub struct RoomListItem(pub matrix_sdk_ui::room_list_service::RoomListItem);
 
-impl RoomListRoom {
+impl RoomListItem {
     pub fn id(&self) -> String {
-        self.0.id().to_string()
+        self.0.room_id().to_string()
     }
 
     /// Get the state of the room.
@@ -45,7 +45,8 @@ impl RoomListRoom {
     pub fn display_name(&self) -> String {
         self.0
             .cached_display_name()
-            .unwrap_or(self.id())
+            .map(|name| name.to_string())
+            .unwrap_or(self.id().to_string())
     }
 
     /// Has the room been tombstoned.
@@ -55,10 +56,11 @@ impl RoomListRoom {
 
     /// Get the `m.room.tombstone` content of this room if there is one.
     pub fn tombstone(&self) -> Box<RoomTombstoneEventContent> {
-        match self.0.tombstone() {
-            None => Box::new(RoomTombstoneEventContent::empty()),
-            Some(inner_content) => Box::new(RoomTombstoneEventContent(Some(inner_content))),
+        if self.0.is_tombstoned() {
+            //TODO: use successor directly
+            //Box::new(RoomTombstoneEventContent(Some(inner_content))),
         }
+        Box::new(RoomTombstoneEventContent::empty())
     }
 
     pub fn topic(&self) -> String {
@@ -96,7 +98,7 @@ impl RoomListRoom {
         self.0.is_low_priority()
     }
 
-    pub fn box_me(&self) -> Box<RoomListRoom> {
-        Box::new(RoomListRoom(self.0.clone()))
+    pub fn box_me(&self) -> Box<RoomListItem> {
+        Box::new(RoomListItem(self.0.clone()))
     }
 }

@@ -73,8 +73,8 @@ public:
     int columnCount(const QModelIndex &parent = QModelIndex()) const override;
     int rowCount(const QModelIndex &parent = QModelIndex()) const override;
 
-    QModelIndex indexForRoom(rust::Box<sdk::RoomListRoom> room) const;
-    std::optional<rust::Box<sdk::RoomListRoom>> roomForIndex(QModelIndex index) const;
+    QModelIndex indexForRoom(rust::Box<sdk::RoomListItem> room) const;
+    std::optional<rust::Box<sdk::RoomListItem>> roomForIndex(QModelIndex index) const;
 
 Q_SIGNALS:
     void connectionChanged();

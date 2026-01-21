@@ -2,31 +2,43 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 use chrono::prelude::{DateTime, Utc};
-use matrix_sdk::matrix_auth::MatrixSession;
-use matrix_sdk::ruma::api::client::room::Visibility;
-use matrix_sdk::ruma::events::room::message::{
-    MessageType, RoomMessageEventContent, TextMessageEventContent,
-};
-use matrix_sdk::ruma::events::AnyMessageLikeEventContent;
 use matrix_sdk::{
     media::MediaFormat,
-    ruma::{RoomId, UserId},
+    ruma::{
+        RoomId,
+        UserId,
+        events::{
+            AnyMessageLikeEventContent,
+            room::message::{
+                MessageType, RoomMessageEventContent, TextMessageEventContent,
+            }
+        },
+        api::{
+            client::{
+                room::Visibility,
+                error::StandardErrorBody
+            }
+        }
+    },
     Client,
+    authentication::matrix::MatrixSession,
 };
-use matrix_sdk_ui::eyeball_im::VectorDiff;
-use matrix_sdk_ui::sync_service::SyncService;
-use matrix_sdk_ui::timeline::{TimelineItemContent, TimelineItemKind, VirtualTimelineItem};
+use matrix_sdk_ui::{
+    eyeball_im::VectorDiff,
+    sync_service::SyncService,
+    timeline::{MsgLikeKind, TimelineBuilder, TimelineItemContent, TimelineItemKind, VirtualTimelineItem}
+};
 use std::sync::{Arc, RwLock};
 use tokio::runtime::Runtime;
 use tokio_stream::StreamExt;
 
 use crate::tombstone::RoomTombstoneEventContent;
 use crate::room::Room;
-use crate::roomlistroom::RoomListRoom;
+use crate::roomlistitem::RoomListItem;
 
 mod tombstone;
 mod room;
-mod roomlistroom;
+mod roomlistitem;
 
 struct Connection {
     rt: Runtime,
@@ -34,10 +46,10 @@ struct Connection {
 }
 
 struct Rooms {
-    queue: Arc<RwLock<Vec<VectorDiff<matrix_sdk_ui::room_list_service::Room>>>>,
+    queue: Arc<RwLock<Vec<VectorDiff<matrix_sdk_ui::room_list_service::RoomListItem>>>>,
 }
 
-struct RoomListVecDiff(VectorDiff<matrix_sdk_ui::room_list_service::Room>);
+struct RoomListVecDiff(VectorDiff<matrix_sdk_ui::room_list_service::RoomListItem>);
 
 impl Rooms {
     fn has_queued_item(&self) -> bool {
@@ -79,23 +91,23 @@ impl RoomListVecDiff {
         }
     }
 
-    fn item(&self) -> Box<RoomListRoom> {
+    fn item(&self) -> Box<RoomListItem> {
         match &self.0 {
-            VectorDiff::Insert { value, .. } => Box::new(RoomListRoom(value.clone())),
-            VectorDiff::Set { value, .. } => Box::new(RoomListRoom(value.clone())),
-            VectorDiff::PushFront { value, .. } => Box::new(RoomListRoom(value.clone())),
-            VectorDiff::PushBack { value, .. } => Box::new(RoomListRoom(value.clone())),
+            VectorDiff::Insert { value, .. } => Box::new(RoomListItem(value.clone())),
+            VectorDiff::Set { value, .. } => Box::new(RoomListItem(value.clone())),
+            VectorDiff::PushFront { value, .. } => Box::new(RoomListItem(value.clone())),
+            VectorDiff::PushBack { value, .. } => Box::new(RoomListItem(value.clone())),
             _ => panic!(),
         }
     }
 
-    fn items_vec(&self) -> Vec<RoomListRoom> {
+    fn items_vec(&self) -> Vec<RoomListItem> {
         match &self.0 {
             VectorDiff::Append { values, .. } => {
-                values.iter().map(|ti| RoomListRoom(ti.clone())).collect()
+                values.iter().map(|ti| RoomListItem(ti.clone())).collect()
             }
             VectorDiff::Reset { values, .. } => {
-                values.iter().map(|ti| RoomListRoom(ti.clone())).collect()
+                values.iter().map(|ti| RoomListItem(ti.clone())).collect()
             }
             _ => panic!(),
         }
@@ -217,12 +229,20 @@ impl TimelineItem {
     fn body(&self) -> String {
         match self.0.kind() {
             TimelineItemKind::Event(event) => match event.content() {
-                TimelineItemContent::Message(message) => message.body().to_string(),
+                TimelineItemContent::MsgLike(message) => match &message.kind {
+                    MsgLikeKind::Message(message) => message.body().to_string(),
+                    MsgLikeKind::Sticker(sticker) => sticker.content().body.clone(),
+                    MsgLikeKind::Poll(_) => "poll".to_string(),
+                    MsgLikeKind::Redacted => "redacted".to_string(),
+                    MsgLikeKind::UnableToDecrypt(_) => "utd".to_string(),
+                    MsgLikeKind::Other(other) => format!("{:?}", other),
+                },
                 event => format!("{:?}", event),
             },
             TimelineItemKind::Virtual(virt) => match virt {
                 VirtualTimelineItem::DateDivider(millis) => format!("{}", millis.0),
                 VirtualTimelineItem::ReadMarker => "Readmarker".to_string(),
+                VirtualTimelineItem::TimelineStart => "Timeline start".to_string(),
             },
         }
     }
@@ -244,7 +264,7 @@ impl TimelineItem {
 
 impl Connection {
     fn restore(secret: String) -> Box<Connection> {
-        let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
+        let rt = Runtime::new().expect("Failed to create runtime");
         let session =
             serde_json::from_str::<MatrixSession>(std::str::from_utf8(secret.as_bytes()).unwrap())
                 .unwrap();
@@ -326,7 +346,7 @@ impl Connection {
         let room_id = RoomId::parse(room_id).unwrap();
         let room = client.get_room(&room_id).unwrap();
         let (timeline, items, stream) = self.rt.block_on(async move {
-            let timeline = matrix_sdk_ui::timeline::Timeline::builder(&room)
+            let timeline = TimelineBuilder::new(&room)
                 .build()
                 .await
                 .unwrap();
@@ -353,11 +373,13 @@ impl Connection {
             loop {
                 let matrix_id = matrix_id.clone();
                 let room_id = room_id.to_string();
-                let Some(entry) = stream.next().await else {
+                let Some(entries) = stream.next().await else {
                     continue; //TODO or return?
                 };
 
-                queue.write().unwrap().push(entry);
+                for entry in entries {
+                    queue.write().unwrap().push(entry);
+                }
                 ffi::shim_timeline_changed(matrix_id, room_id);
             }
         });
@@ -430,16 +452,22 @@ impl Connection {
             use matrix_sdk::HttpError::Api;
             use matrix_sdk::RumaApiError::ClientApi;
             match result {
-                Err(Api(Server(ClientApi(Error {
-                    status_code: StatusCode::UNAUTHORIZED,
-                    body:
-                        ErrorBody::Standard {
-                            kind: ErrorKind::UnknownToken { .. },
-                            ..
-                        },
-                    ..
-                }))))
-                | Ok(..) => {
+                Err(Api(error)) => {
+                    match error.as_ref() {
+                        Server(ClientApi(Error {
+                             status_code: StatusCode::UNAUTHORIZED,
+                             body: ErrorBody::Standard(StandardErrorBody {
+                                kind: ErrorKind::UnknownToken { .. },
+                                ..
+                             }),
+                             ..
+                        })) => {
+                            ffi::shim_logged_out(client.user_id().unwrap().to_string());
+                        }
+                        _ => {}
+                    }
+                },
+                Ok(..) => {
                     ffi::shim_logged_out(client.user_id().unwrap().to_string());
                 }
                 x => eprintln!("Error logging out: {:?}", x),
@@ -517,7 +545,7 @@ mod ffi {
     extern "Rust" {
         type RoomTombstoneEventContent;
         type Connection;
-        type RoomListRoom;
+        type RoomListItem;
         type TimelineItem;
         type Rooms;
         type Timeline;
@@ -542,21 +570,6 @@ mod ffi {
         fn create_room(self: &Connection, room_create_options: &RoomCreateOptions);
         fn room(self: &Connection, id: String) -> Box<Room>;
 
-        fn id(self: &RoomListRoom) -> String;
-        fn state(self: &RoomListRoom) -> u8;
-        fn is_space(self: &RoomListRoom) -> bool;
-        fn room_type(self: &RoomListRoom) -> String;
-        fn display_name(self: &RoomListRoom) -> String;
-        fn is_tombstoned(self: &RoomListRoom) -> bool;
-        fn tombstone(self: &RoomListRoom) -> Box<RoomTombstoneEventContent>;
-        fn topic(self: &RoomListRoom) -> String;
-        fn num_unread_messages(self: &RoomListRoom) -> u64;
-        fn num_unread_mentions(self: &RoomListRoom) -> u64;
-        fn canonical_alias(self: &RoomListRoom) -> String;
-        fn is_favourite(self: &RoomListRoom) -> bool;
-        fn is_low_priority(self: &RoomListRoom) -> bool;
-        fn box_me(self: &RoomListRoom) -> Box<RoomListRoom>;
-
         fn id(self: &TimelineItem) -> String;
         fn body(self: &TimelineItem) -> String;
         fn box_me(self: &TimelineItem) -> Box<TimelineItem>;
@@ -576,8 +589,8 @@ mod ffi {
 
         fn op(self: &RoomListVecDiff) -> u8;
         fn index(self: &RoomListVecDiff) -> usize;
-        fn item(self: &RoomListVecDiff) -> Box<RoomListRoom>;
-        fn items_vec(self: &RoomListVecDiff) -> Vec<RoomListRoom>;
+        fn item(self: &RoomListVecDiff) -> Box<RoomListItem>;
+        fn items_vec(self: &RoomListVecDiff) -> Vec<RoomListItem>;
 
         fn room_create_options_new() -> Box<RoomCreateOptions>;
         fn set_invite(self: &mut RoomCreateOptions, users: Vec<String>);
@@ -598,6 +611,21 @@ mod ffi {
         fn num_unread_mentions(self: &Room) -> u64;
         fn is_favourite(self: &Room) -> bool;
         fn is_low_priority(self: &Room) -> bool;
+
+        fn id(self: &RoomListItem) -> String;
+        fn state(self: &RoomListItem) -> u8;
+        fn is_space(self: &RoomListItem) -> bool;
+        fn room_type(self: &RoomListItem) -> String;
+        fn display_name(self: &RoomListItem) -> String;
+        fn is_tombstoned(self: &RoomListItem) -> bool;
+        fn tombstone(self: &RoomListItem) -> Box<RoomTombstoneEventContent>;
+        fn topic(self: &RoomListItem) -> String;
+        fn num_unread_messages(self: &RoomListItem) -> u64;
+        fn num_unread_mentions(self: &RoomListItem) -> u64;
+        fn canonical_alias(self: &RoomListItem) -> String;
+        fn is_favourite(self: &RoomListItem) -> bool;
+        fn is_low_priority(self: &RoomListItem) -> bool;
+        fn box_me(self: &RoomListItem) -> Box<RoomListItem>;
     }
 
     unsafe extern "C++" {

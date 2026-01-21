@@ -454,7 +454,7 @@ QVariant RoomTreeModel::data(const QModelIndex &index, int role) const
     return {};
 }
 
-QModelIndex RoomTreeModel::indexForRoom(rust::Box<sdk::RoomListRoom> room) const
+QModelIndex RoomTreeModel::indexForRoom(rust::Box<sdk::RoomListItem> room) const
 {
     // Try and find by checking type.
     const auto type = NeoChatRoomType::typeForRoom(room->box_me());
@@ -475,7 +475,7 @@ QModelIndex RoomTreeModel::indexForRoom(rust::Box<sdk::RoomListRoom> room) const
     return {};
 }
 
-std::optional<rust::Box<sdk::RoomListRoom>> RoomTreeModel::roomForIndex(QModelIndex index) const
+std::optional<rust::Box<sdk::RoomListItem>> RoomTreeModel::roomForIndex(QModelIndex index) const
 {
     RoomTreeItem *child = getItem(index);
     if (std::holds_alternative<NeoChatRoomType::Type>(child->data())) {
