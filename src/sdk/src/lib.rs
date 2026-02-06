@@ -542,10 +542,18 @@ impl Connection {
     }
 
     fn room(&self, id: String) -> Box<Room> {
+        println!("Looking up room {}", id);
+        // TODO: This seems to sometimes return None even when we are joined to the room; figure out why
+        // Leads to a crash on startup, probably the initial sync isn't completed yet?
         let room_id = RoomId::parse(id).unwrap();
         Box::new(Room {
             room: self.client.get_room(&room_id).unwrap(),
         })
+    }
+
+    fn is_known_room(&self, id: String) -> bool {
+        let room_id = RoomId::parse(id).unwrap();
+        self.client.get_room(&room_id).is_some()
     }
 }
 
@@ -634,6 +642,7 @@ mod ffi {
         fn logout(self: &Connection);
         fn create_room(self: &Connection, room_create_options: &RoomCreateOptions);
         fn room(self: &Connection, id: String) -> Box<Room>;
+        fn is_known_room(self: &Connection, id: String) -> bool;
 
         fn id(self: &TimelineItem) -> String;
         fn body(self: &TimelineItem) -> String;

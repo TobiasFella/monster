@@ -37,6 +37,7 @@ public:
     Q_INVOKABLE void createRoom(const QString &name = {}, const QString &topic = {}, const QString &alias = {});
 
     Q_INVOKABLE Quotient::Room *room(const QString &id);
+    Q_INVOKABLE bool hasRoom(const QString &id);
 
     /*
      * @brief Get a room stream for the connection.

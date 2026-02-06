@@ -131,8 +131,9 @@ bool SortFilterRoomTreeModel::filterAcceptsRow(int source_row, const QModelIndex
         return false;
     }
 
+    auto treeModel = dynamic_cast<RoomTreeModel *>(sourceModel());
     if (sourceModel()->data(index, RoomTreeModel::JoinStateRole).toString() == u"upgraded"_s
-        && dynamic_cast<RoomTreeModel *>(sourceModel())->connection()->room(sourceModel()->data(index, RoomTreeModel::ReplacementIdRole).toString())) {
+        && treeModel->connection()->hasRoom(sourceModel()->data(index, RoomTreeModel::ReplacementIdRole).toString())) {
         return false;
     }
 

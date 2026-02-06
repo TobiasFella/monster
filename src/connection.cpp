@@ -92,6 +92,11 @@ Room *Connection::room(const QString &id)
     return new Room(connection()->room(stringToRust(id)));
 }
 
+bool Connection::hasRoom(const QString &id)
+{
+    return connection()->is_known_room(stringToRust(id));
+}
+
 std::unique_ptr<RoomStream> Connection::roomStream()
 {
     return std::make_unique<RoomStream>(this);
