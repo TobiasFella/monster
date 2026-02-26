@@ -76,12 +76,19 @@ Kirigami.ApplicationWindow {
         }
         FormCard.FormCard {
             Repeater {
+                id: existingAccounts
                 model: accounts.availableAccounts
                 delegate: FormCard.FormButtonDelegate {
                     required property string modelData
                     text: modelData
-                    onClicked: pendingConnections.target = accounts.loadAccount(modelData)
+                    onClicked: {
+                        root.pending = accounts.loadAccount(modelData)
+                    }
                 }
+            }
+            FormCard.FormTextDelegate {
+                text: i18nc("@info", "No accounts available")
+                visible: existingAccounts.count === 0
             }
         }
     }

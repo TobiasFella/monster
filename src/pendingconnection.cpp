@@ -99,17 +99,17 @@ PendingConnection *PendingConnection::loginWithOidc(const QString &serverName, A
         QDesktopServices::openUrl(pendingConnection->m_oidcLoginUrl);
     });
     //TODO: Deduplicate
-    connect(Dispatcher::instance(), &Dispatcher::connected, pendingConnection, [pendingConnection, serverName](const QString &matrixId) {
-        // NOTE: this is not a matrix id, but for simplicity, we just use the same function
-        if (matrixId != serverName) {
+    connect(Dispatcher::instance(), &Dispatcher::connected, pendingConnection, [pendingConnection, serverName](const QString &server) {
+        if (server != serverName) {
             return;
         }
 
         const auto data = (*pendingConnection->wrapper->m_connection)->session();
 
+        pendingConnection->setMatrixId(stringFromRust((*pendingConnection->wrapper->m_connection)->matrix_id()));
         const auto job = new QKeychain::WritePasswordJob(qAppName());
-        job->setKey(matrixId);
-        job->setBinaryData({data.data(), (int)data.size()});
+        job->setKey(pendingConnection->matrixId());
+        job->setBinaryData({data.data(), static_cast<int>(data.size())});
         job->setAutoDelete(true);
         job->start();
 

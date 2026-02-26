@@ -5,7 +5,7 @@ use chrono::prelude::{DateTime, Utc};
 use matrix_sdk::authentication::oauth::registration::{
     ApplicationType, ClientMetadata, Localized, OAuthGrantType,
 };
-use matrix_sdk::authentication::oauth::{ClientRegistrationData, UrlOrQuery};
+use matrix_sdk::authentication::oauth::{ClientId, ClientRegistrationData, OAuthSession, UrlOrQuery, UserSession};
 use matrix_sdk::reqwest::Url;
 use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::{
@@ -29,6 +29,7 @@ use matrix_sdk_ui::{
     },
 };
 use std::sync::{Arc, RwLock};
+use matrix_sdk::ruma::exports::serde::{Deserialize, Serialize};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpSocket;
 use tokio::runtime::Runtime;
@@ -45,6 +46,18 @@ mod tombstone;
 struct Connection {
     rt: Runtime,
     client: Client,
+}
+
+#[derive(Serialize, Deserialize)]
+struct SessionData {
+    oidc: Option<OidcSession>,
+    native: Option<MatrixSession>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct OidcSession {
+    client_id: ClientId,
+    user_session: UserSession,
 }
 
 struct Rooms {
@@ -266,19 +279,23 @@ impl TimelineItem {
 
 impl Connection {
     fn restore(secret: String) -> Box<Connection> {
+        let session_data: SessionData = serde_json::from_str(&secret).unwrap();
         let rt = Runtime::new().expect("Failed to create runtime");
-        let session =
-            serde_json::from_str::<MatrixSession>(std::str::from_utf8(secret.as_bytes()).unwrap())
-                .unwrap();
-        let matrix_id = session.meta.user_id.to_string();
+
+        let matrix_id = if session_data.oidc.is_some() {
+            session_data.oidc.as_ref().unwrap().user_session.meta.user_id.clone()
+        } else {
+            session_data.native.as_ref().unwrap().meta.user_id.clone()
+        };
+
         let client = rt.block_on(async {
             Client::builder()
-                .server_name(UserId::parse(&session.meta.user_id).unwrap().server_name())
+                .server_name(matrix_id.server_name())
                 .sqlite_store(
                     dirs::state_dir()
                         .unwrap()
                         .join("monster")
-                        .join(session.meta.user_id.to_string()),
+                        .join(matrix_id.to_string()),
                     None, /* TODO: passphrase */
                 )
                 .build()
@@ -287,8 +304,16 @@ impl Connection {
         });
         let client_clone = client.clone();
         rt.spawn(async move {
-            client_clone.restore_session(session).await.unwrap();
-            ffi::shim_connected(matrix_id);
+            if session_data.oidc.is_some() {
+                let oidc = session_data.oidc.unwrap();
+                client_clone.restore_session(OAuthSession {
+                    client_id: oidc.client_id,
+                    user: oidc.user_session,
+                }).await.unwrap();
+            } else {
+                client_clone.restore_session(session_data.native.unwrap()).await.unwrap();
+            }
+            ffi::shim_connected(matrix_id.to_string());
         });
         Box::new(Connection { rt, client })
     }
@@ -302,11 +327,21 @@ impl Connection {
 
     fn session(&self) -> String {
         use matrix_sdk::AuthSession;
-        if let AuthSession::Matrix(session) = self.client.session().unwrap() {
-            serde_json::to_string(&session).unwrap()
-        } else {
-            Default::default()
-        }
+        let data = match self.client.session().unwrap() {
+            AuthSession::Matrix(session) => SessionData {
+                oidc: None,
+                native: Some(session),
+            },
+            AuthSession::OAuth(session) => SessionData {
+                oidc: Some(OidcSession {
+                    client_id: session.client_id,
+                    user_session: session.user,
+                }),
+                native: None,
+            },
+            _ => panic!("Unexpected auth session type"),
+        };
+        serde_json::to_string(&data).unwrap()
     }
 
     fn init(matrix_id: String, password: String) -> Box<Connection> {

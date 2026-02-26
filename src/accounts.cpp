@@ -24,11 +24,11 @@ Accounts::Accounts(QObject *parent)
 void Accounts::loadAccounts()
 {
     const auto dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    QDir().mkpath(dir);
-    auto file = dir + QDir::separator() + u"Accounts"_s;
+    (void) QDir().mkpath(dir);
+    const auto file = dir + QDir::separator() + u"Accounts"_s;
     QFile accounts(file);
-    accounts.open(QIODevice::ReadWrite);
-    auto data = QString::fromUtf8(accounts.readAll()).split(u'\n');
+    (void) accounts.open(QIODevice::ReadWrite);
+    const auto data = QString::fromUtf8(accounts.readAll()).split(u'\n');
 
     for (const auto &account : data) {
         if (!account.isEmpty()) {
@@ -44,7 +44,7 @@ QStringList Accounts::availableAccounts() const
     return QList(m_availableAccounts.begin(), m_availableAccounts.end());
 }
 
-Quotient::PendingConnection *Accounts::loginWithPassword(const QString &matrixId, const QString &password)
+PendingConnection *Accounts::loginWithPassword(const QString &matrixId, const QString &password)
 {
     auto pending = PendingConnection::loginWithPassword(matrixId, password, this);
 
@@ -55,7 +55,7 @@ Quotient::PendingConnection *Accounts::loginWithPassword(const QString &matrixId
     return pending;
 }
 
-Quotient::PendingConnection *Accounts::loadAccount(const QString &matrixId)
+PendingConnection *Accounts::loadAccount(const QString &matrixId)
 {
     return PendingConnection::loadAccount(matrixId, this);
 }
@@ -87,7 +87,12 @@ void Accounts::saveAccounts()
     accounts.close();
 }
 
-Quotient::PendingConnection *Accounts::loginWithOidc(const QString &serverName)
+PendingConnection *Accounts::loginWithOidc(const QString &serverName)
 {
-    return PendingConnection::loginWithOidc(serverName, this);
+    auto pending = PendingConnection::loginWithOidc(serverName, this);
+    connect(pending, &PendingConnection::ready, this, [this, pending] {
+        m_allAccounts += pending->matrixId();
+        saveAccounts();
+    });
+    return pending;
 }
