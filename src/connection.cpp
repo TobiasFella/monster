@@ -21,24 +21,22 @@ using namespace Quotient;
 class Connection::Private
 {
 public:
-    RustConnectionWrapper *wrapper = nullptr;
+    std::optional<rust::Box<sdk::Connection>> m_connection;
 
     std::unique_ptr<RoomStream> roomStream = nullptr;
 
-    Private(RustConnectionWrapper *wrapper)
-        : wrapper(wrapper)
+    explicit Private(std::optional<rust::Box<sdk::Connection>> connection)
+        : m_connection(std::move(connection))
     {}
 
-    ~Private() {
-        delete wrapper;
-    }
+    ~Private() = default;
 };
 
 Connection::~Connection() = default;
 
-Connection::Connection(RustConnectionWrapper *wrapper)
+Connection::Connection(std::optional<rust::Box<sdk::Connection>> rawConnection)
     : QObject(nullptr)
-    , d(std::make_unique<Private>(wrapper))
+    , d(std::make_unique<Private>(std::move(rawConnection)))
 {
 }
 
@@ -49,7 +47,7 @@ QString Connection::matrixId() const
 
 rust::Box<sdk::Connection> &Connection::connection() const
 {
-    return *d->wrapper->m_connection;
+    return d->m_connection.value();
 }
 
 void Connection::open(const QString &roomId)

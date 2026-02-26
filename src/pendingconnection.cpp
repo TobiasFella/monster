@@ -36,7 +36,7 @@ PendingConnection *PendingConnection::loginWithPassword(const QString &matrixId,
 {
     auto pendingConnection = new PendingConnection();
     pendingConnection->setMatrixId(matrixId);
-    pendingConnection->wrapper = new RustConnectionWrapper { sdk::init(stringToRust(matrixId), stringToRust(password)) };
+    pendingConnection->m_rawConnection = sdk::init(stringToRust(matrixId), stringToRust(password));
     // TODO: Disconnect this once logged in
     connect(Dispatcher::instance(), &Dispatcher::connected, pendingConnection, [pendingConnection](const QString &matrixId) {
         if (matrixId != pendingConnection->matrixId()) {
@@ -64,7 +64,7 @@ PendingConnection *PendingConnection::loadAccount(const QString &matrixId, Accou
             return;
         }
         const auto data = job->binaryData();
-        pendingConnection->wrapper = new RustConnectionWrapper { sdk::restore(rust::String(data.data(), data.size())) };
+        pendingConnection->m_rawConnection = sdk::restore(rust::String(data.data(), data.size()));
         connect(Dispatcher::instance(), &Dispatcher::connected, pendingConnection, [pendingConnection](const QString &) {
             pendingConnection->initialize(ConnectionType::Existing);
         });
@@ -76,7 +76,7 @@ PendingConnection *PendingConnection::loadAccount(const QString &matrixId, Accou
 PendingConnection *PendingConnection::loginWithOidc(const QString &serverName, Accounts *accounts)
 {
     const auto pendingConnection = new PendingConnection();
-    pendingConnection->wrapper = new RustConnectionWrapper { sdk::init_oidc(stringToRust(serverName)) };
+    pendingConnection->m_rawConnection = sdk::init_oidc(stringToRust(serverName));
     //TODO connectuntil
     connect(Dispatcher::instance(), &Dispatcher::oidcLoginUrlAvailable, pendingConnection, [pendingConnection, serverName](const auto &server, const auto &url) {
         if (server != serverName) {
@@ -92,7 +92,7 @@ PendingConnection *PendingConnection::loginWithOidc(const QString &serverName, A
             return;
         }
 
-        pendingConnection->setMatrixId(stringFromRust((*pendingConnection->wrapper->m_connection)->matrix_id()));
+        pendingConnection->setMatrixId(stringFromRust((*pendingConnection->m_rawConnection)->matrix_id()));
         pendingConnection->initialize(ConnectionType::New);
     });
     pendingConnection->m_accounts = accounts;
@@ -106,8 +106,8 @@ Connection *PendingConnection::connection()
     }
 
     if (!m_connection) {
-        m_connection = new Connection(wrapper);
-        wrapper = nullptr;
+        m_connection = new Connection(std::move(m_rawConnection));
+        m_rawConnection = std::nullopt;
     }
 
     return m_connection;
@@ -143,7 +143,7 @@ void PendingConnection::initialize(ConnectionType type)
     if (type == ConnectionType::New) {
         const auto job = new QKeychain::WritePasswordJob(qAppName());
         job->setKey(matrixId());
-        job->setBinaryData(bytesFromRust((*wrapper->m_connection)->session()));
+        job->setBinaryData(bytesFromRust((*m_rawConnection)->session()));
         job->setAutoDelete(true);
         job->start();
 

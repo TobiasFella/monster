@@ -14,11 +14,6 @@ namespace Quotient
 {
 class RoomStream;
 
-struct RustConnectionWrapper
-{
-    std::optional<rust::Box<sdk::Connection>> m_connection;
-};
-
 class Connection : public QObject
 {
     Q_OBJECT
@@ -56,7 +51,7 @@ private:
     std::unique_ptr<Private> d;
     friend class PendingConnection;
 
-    Connection(RustConnectionWrapper *wrapper);
+    Connection(std::optional<rust::Box<sdk::Connection>> wrapper);
 
     static Connection *loginWithPassword(const QString &matrixId, const QString &password);
     static Connection *loadAccount(const QString &matrixId);

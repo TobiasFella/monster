@@ -53,7 +53,7 @@ private:
     bool m_ready = false;
     QString m_matrixId;
     QUrl m_oidcLoginUrl;
-    RustConnectionWrapper *wrapper = nullptr;
+    std::optional<rust::Box<sdk::Connection>> m_rawConnection;
     Accounts *m_accounts = nullptr;
     Connection *m_connection = nullptr;
     void initialize(ConnectionType type);
