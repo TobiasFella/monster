@@ -5,15 +5,19 @@
 
 rust::String stringToRust(const QString &string)
 {
-    return rust::String(string.toLatin1().data(), string.length());
+    return {string.toLatin1().data(), string.length()};
 }
 
-QString stringFromRust(rust::String string)
+QString stringFromRust(const rust::String &string)
 {
-    return QString::fromLatin1({string.data(), (int)string.length()});
+    return QString::fromLatin1({string.data(), static_cast<int>(string.length())});
 }
 
 rust::String stringToRust(const char *string)
 {
-    return rust::String(string, strlen(string));
+    return {string, strlen(string)};
+}
+QByteArray bytesFromRust(const rust::String &string)
+{
+    return {string.data(), static_cast<qsizetype>(string.length())};
 }

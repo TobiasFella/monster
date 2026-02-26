@@ -12,7 +12,7 @@
 
 #include "pendingconnection.h"
 
-using namespace Qt::Literals::StringLiterals;
+using namespace Qt::StringLiterals;
 using namespace Quotient;
 
 Accounts::Accounts(QObject *parent)
@@ -21,6 +21,23 @@ Accounts::Accounts(QObject *parent)
     QMetaObject::invokeMethod(this, &Accounts::loadAccounts);
 }
 
+void Accounts::accountLoaded(PendingConnection *connection)
+{
+    if (!m_availableAccounts.contains(connection->matrixId())) {
+        m_availableAccounts.append(connection->matrixId());
+        Q_EMIT availableAccountsChanged();
+    }
+    m_loadedAccounts.append(connection);
+    saveAccounts();
+}
+
+void Accounts::accountLoggedOut(const QString &matrixId)
+{
+    m_availableAccounts.removeAll(matrixId);
+    Q_EMIT availableAccountsChanged();
+    //TODO remove account from loaded accounts;
+    saveAccounts();
+}
 void Accounts::loadAccounts()
 {
     const auto dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
@@ -31,8 +48,7 @@ void Accounts::loadAccounts()
     const auto data = QString::fromUtf8(accounts.readAll()).split(u'\n');
 
     for (const auto &account : data) {
-        if (!account.isEmpty()) {
-            m_allAccounts += account;
+        if (!account.isEmpty() && !m_availableAccounts.contains(account)) {
             m_availableAccounts += account;
         }
     }
@@ -41,18 +57,12 @@ void Accounts::loadAccounts()
 
 QStringList Accounts::availableAccounts() const
 {
-    return QList(m_availableAccounts.begin(), m_availableAccounts.end());
+    return m_availableAccounts;
 }
 
 PendingConnection *Accounts::loginWithPassword(const QString &matrixId, const QString &password)
 {
-    auto pending = PendingConnection::loginWithPassword(matrixId, password, this);
-
-    m_allAccounts += pending->matrixId();
-
-    saveAccounts();
-
-    return pending;
+    return PendingConnection::loginWithPassword(matrixId, password, this);
 }
 
 PendingConnection *Accounts::loadAccount(const QString &matrixId)
@@ -60,39 +70,19 @@ PendingConnection *Accounts::loadAccount(const QString &matrixId)
     return PendingConnection::loadAccount(matrixId, this);
 }
 
-void Accounts::newConnection(Connection *connection)
-{
-    connect(connection, &Connection::loggedOut, this, [connection, this](){
-        m_allAccounts.remove(connection->matrixId());
-        saveAccounts();
-        auto job = new QKeychain::DeletePasswordJob(qAppName());
-        job->setKey(connection->matrixId());
-        job->setAutoDelete(true);
-        job->start();
-        connect(job, &QKeychain::Job::finished, this, [job]() {
-            if (job->error() != QKeychain::NoError) {
-                qWarning() << "Failed to delete from keychain" << job->error();
-            }
-        });
-    });
-}
-
-void Accounts::saveAccounts()
+void Accounts::saveAccounts() const
 {
     const auto dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    auto file = dir + QDir::separator() + u"Accounts"_s;
+    const auto file = dir + QDir::separator() + u"Accounts"_s;
     QFile accounts(file);
-    accounts.open(QIODevice::WriteOnly);
-    accounts.write(QList(m_allAccounts.begin(), m_allAccounts.end()).join(u'\n').toUtf8());
+    if (!accounts.open(QIODevice::WriteOnly)) {
+        qCritical() << Q_FUNC_INFO << "Error opening accounts file";
+    }
+    accounts.write(m_availableAccounts.join(u'\n').toUtf8());
     accounts.close();
 }
 
 PendingConnection *Accounts::loginWithOidc(const QString &serverName)
 {
-    auto pending = PendingConnection::loginWithOidc(serverName, this);
-    connect(pending, &PendingConnection::ready, this, [this, pending] {
-        m_allAccounts += pending->matrixId();
-        saveAccounts();
-    });
-    return pending;
+    return PendingConnection::loginWithOidc(serverName, this);
 }

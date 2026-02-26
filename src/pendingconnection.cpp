@@ -16,44 +16,33 @@
 
 using namespace Quotient;
 
-PendingConnection::~PendingConnection() {
-}
+enum class ConnectionType
+{
+    New,
+    Existing,
+};
+
+PendingConnection::~PendingConnection() = default;
 
 PendingConnection::PendingConnection() = default;
 
 void PendingConnection::setMatrixId(const QString &matrixId)
 {
     m_matrixId = matrixId;
+    Q_EMIT matrixIdChanged();
 }
 
-Quotient::PendingConnection *PendingConnection::loginWithPassword(const QString &matrixId, const QString &password, Accounts *accounts)
+PendingConnection *PendingConnection::loginWithPassword(const QString &matrixId, const QString &password, Accounts *accounts)
 {
     auto pendingConnection = new PendingConnection();
     pendingConnection->setMatrixId(matrixId);
     pendingConnection->wrapper = new RustConnectionWrapper { sdk::init(stringToRust(matrixId), stringToRust(password)) };
     // TODO: Disconnect this once logged in
     connect(Dispatcher::instance(), &Dispatcher::connected, pendingConnection, [pendingConnection](const QString &matrixId) {
-        if (matrixId != pendingConnection->m_matrixId) {
+        if (matrixId != pendingConnection->matrixId()) {
             return;
         }
-
-        const auto data = (*pendingConnection->wrapper->m_connection)->session();
-
-        auto job = new QKeychain::WritePasswordJob(qAppName());
-        job->setKey(matrixId);
-        job->setBinaryData({data.data(), (int)data.size()});
-        job->setAutoDelete(true);
-        job->start();
-
-        connect(job, &QKeychain::WritePasswordJob::finished, pendingConnection, [pendingConnection](const auto &job) {
-            if (job->error() != QKeychain::NoError) {
-                qWarning() << "Failed to write to keychain" << job->error();
-                //TODO error the entire pendingConnection;
-                return;
-            }
-            pendingConnection->m_ready = true;
-            Q_EMIT pendingConnection->ready();
-        });
+        pendingConnection->initialize(ConnectionType::New);
     });
     pendingConnection->m_accounts = accounts;
     return pendingConnection;
@@ -68,7 +57,7 @@ PendingConnection *PendingConnection::loadAccount(const QString &matrixId, Accou
     job->setKey(matrixId);
     job->setAutoDelete(true);
     job->start();
-    connect(job, &QKeychain::Job::finished, pendingConnection, [job, pendingConnection]() {
+    connect(job, &QKeychain::Job::finished, pendingConnection, [job, pendingConnection] {
         if (job->error() != QKeychain::NoError) {
             //TODO error entirely here
             qWarning() << "Failed to read from keychain" << job->error();
@@ -77,8 +66,7 @@ PendingConnection *PendingConnection::loadAccount(const QString &matrixId, Accou
         const auto data = job->binaryData();
         pendingConnection->wrapper = new RustConnectionWrapper { sdk::restore(rust::String(data.data(), data.size())) };
         connect(Dispatcher::instance(), &Dispatcher::connected, pendingConnection, [pendingConnection](const QString &) {
-            pendingConnection->m_ready = true;
-            Q_EMIT pendingConnection->ready();
+            pendingConnection->initialize(ConnectionType::Existing);
         });
     });
     pendingConnection->m_accounts = accounts;
@@ -104,24 +92,8 @@ PendingConnection *PendingConnection::loginWithOidc(const QString &serverName, A
             return;
         }
 
-        const auto data = (*pendingConnection->wrapper->m_connection)->session();
-
         pendingConnection->setMatrixId(stringFromRust((*pendingConnection->wrapper->m_connection)->matrix_id()));
-        const auto job = new QKeychain::WritePasswordJob(qAppName());
-        job->setKey(pendingConnection->matrixId());
-        job->setBinaryData({data.data(), static_cast<int>(data.size())});
-        job->setAutoDelete(true);
-        job->start();
-
-        connect(job, &QKeychain::WritePasswordJob::finished, pendingConnection, [pendingConnection](const auto &job) {
-            if (job->error() != QKeychain::NoError) {
-                qWarning() << "Failed to write to keychain" << job->error();
-                //TODO error the entire pendingConnection;
-                return;
-            }
-            pendingConnection->m_ready = true;
-            Q_EMIT pendingConnection->ready();
-        });
+        pendingConnection->initialize(ConnectionType::New);
     });
     pendingConnection->m_accounts = accounts;
     return pendingConnection;
@@ -132,10 +104,13 @@ Connection *PendingConnection::connection()
     if (!m_ready) {
         return {};
     }
-    auto connection = new Connection(wrapper);
-    m_accounts->newConnection(connection);
-    wrapper = nullptr;
-    return connection;
+
+    if (!m_connection) {
+        m_connection = new Connection(wrapper);
+        wrapper = nullptr;
+    }
+
+    return m_connection;
 }
 
 QString PendingConnection::matrixId() const
@@ -146,4 +121,49 @@ QString PendingConnection::matrixId() const
 QUrl PendingConnection::oidcLoginUrl() const
 {
     return m_oidcLoginUrl;
+}
+
+void PendingConnection::initialize(ConnectionType type)
+{
+    m_accounts->accountLoaded(this);
+
+    connect(connection(), &Connection::loggedOut, connection(), [this] {
+        m_accounts->accountLoggedOut(matrixId());
+        auto job = new QKeychain::DeletePasswordJob(qAppName());
+        job->setKey(matrixId());
+        job->setAutoDelete(true);
+        job->start();
+        connect(job, &QKeychain::Job::finished, this, [job] {
+            if (job->error() != QKeychain::NoError) {
+                qWarning() << "Failed to delete key" << job->error();
+            }
+        });
+    });
+
+    if (type == ConnectionType::New) {
+        const auto job = new QKeychain::WritePasswordJob(qAppName());
+        job->setKey(matrixId());
+        job->setBinaryData(bytesFromRust((*wrapper->m_connection)->session()));
+        job->setAutoDelete(true);
+        job->start();
+
+        connect(job, &QKeychain::WritePasswordJob::finished, this, [this](const auto &job) {
+            if (job->error() != QKeychain::NoError) {
+                qWarning() << "Failed to write to keychain" << job->error();
+                //TODO error the entire pendingConnection;
+                return;
+            }
+            setReady(true);
+        });
+    } else {
+        setReady(true);
+    }
+}
+void PendingConnection::setReady(const bool ready)
+{
+    if (m_ready == ready) {
+        return;
+    }
+    m_ready = ready;
+    Q_EMIT this->ready();
 }

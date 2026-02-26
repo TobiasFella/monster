@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include <QList>
 #include <QObject>
 #include <qqmlintegration.h>
 
@@ -23,27 +22,30 @@ class Accounts : public QObject
 public:
     explicit Accounts(QObject *parent = nullptr);
 
-    QStringList availableAccounts() const;
+    [[nodiscard]] QStringList availableAccounts() const;
 
-    //! Log in to an account that is not already logged in on the client
+    //! Log in to an account that is not already logged in on the client, with native matrix login
     Q_INVOKABLE Quotient::PendingConnection *loginWithPassword(const QString &matrixId, const QString &password);
 
+    //! Log in to an account that is not already logged in on the client, with oidc login
     Q_INVOKABLE Quotient::PendingConnection *loginWithOidc(const QString &serverName);
 
     //! Load an account that is already logged in (i.e., which is listed in Accounts::availableAccounts)
     Q_INVOKABLE Quotient::PendingConnection *loadAccount(const QString &matrixId);
 
-    void newConnection(Quotient::Connection *connection);
-
 Q_SIGNALS:
     void availableAccountsChanged();
 
 private:
-    QSet<QString> m_availableAccounts;
-    QSet<QString> m_allAccounts;
+    friend class PendingConnection;
+    QStringList m_availableAccounts;
+    QList<PendingConnection *> m_loadedAccounts;
 
+
+    void accountLoaded(PendingConnection *connection);
+    void accountLoggedOut(const QString &matrixId);
     void loadAccounts();
-    void saveAccounts();
+    void saveAccounts() const;
 };
 
 }

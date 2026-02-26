@@ -7,6 +7,8 @@
 
 rust::String stringToRust(const QString &string);
 
-QString stringFromRust(rust::String string);
+QString stringFromRust(const rust::String &string);
 
 rust::String stringToRust(const char *string);
+
+QByteArray bytesFromRust(const rust::String &string);

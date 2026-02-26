@@ -8,6 +8,8 @@
 
 #include "connection.h"
 
+enum class ConnectionType;
+
 namespace Quotient
 {
 class Accounts;
@@ -18,6 +20,7 @@ class PendingConnection : public QObject
     QML_ELEMENT
     QML_UNCREATABLE("")
     Q_PROPERTY(QUrl oidcLoginUrl READ oidcLoginUrl NOTIFY oidcLoginUrlChanged)
+    Q_PROPERTY(QString matrixId READ matrixId NOTIFY matrixIdChanged)
 
 public:
     /**
@@ -28,11 +31,12 @@ public:
      */
     Q_INVOKABLE Quotient::Connection *connection();
 
-    QString matrixId() const;
-    QUrl oidcLoginUrl() const;
+    [[nodiscard]] QString matrixId() const;
+    [[nodiscard]] QUrl oidcLoginUrl() const;
     ~PendingConnection() override;
 
 Q_SIGNALS:
+    void matrixIdChanged();
     void ready();
     void oidcLoginUrlChanged();
 
@@ -50,7 +54,10 @@ private:
     QString m_matrixId;
     QUrl m_oidcLoginUrl;
     RustConnectionWrapper *wrapper = nullptr;
-    Quotient::Accounts *m_accounts;
+    Accounts *m_accounts = nullptr;
+    Connection *m_connection = nullptr;
+    void initialize(ConnectionType type);
+    void setReady(bool ready);
 };
 
 }
