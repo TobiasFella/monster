@@ -7,7 +7,7 @@
 #include <QString>
 #include <qqmlintegration.h>
 
-#include "lib.rs.h"
+#include "ffi.rs.h"
 #include "rust/cxx.h"
 
 namespace Quotient

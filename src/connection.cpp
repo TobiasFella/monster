@@ -9,11 +9,12 @@
 #include <memory>
 #include <qt6keychain/keychain.h>
 
-#include "lib.rs.h"
-#include "roomstream.h"
-#include "utils.h"
 #include "dispatcher.h"
+#include "ffi.rs.h"
 #include "room.h"
+#include "roomstream.h"
+#include "sdk/src/task.h"
+#include "utils.h"
 
 using namespace Qt::Literals::StringLiterals;
 using namespace Quotient;
@@ -93,6 +94,12 @@ Room *Connection::room(const QString &id)
 bool Connection::hasRoom(const QString &id)
 {
     return connection()->is_known_room(stringToRust(id));
+}
+
+Task *Connection::setDisplayName(const QString &displayName)
+{
+    const auto token = stringFromRust(connection()->set_display_name(stringToRust(displayName)));
+    return new Task(token, this);
 }
 
 std::unique_ptr<RoomStream> Connection::roomStream()

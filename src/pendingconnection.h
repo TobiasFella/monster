@@ -14,6 +14,12 @@ namespace Quotient
 {
 class Accounts;
 
+/*!
+ * \class PendingConnection
+ * \brief A connection that is not yet ready to be used.
+ * This is the initial state of a connection. Either login or registration has not finished yet, or the account is not loaded yet.
+ * PendingConnection objects are acquired from Accounts and can be used to get the loaded connection after the ready() signal was emitted.
+ */
 class PendingConnection : public QObject
 {
     Q_OBJECT
@@ -24,15 +30,21 @@ class PendingConnection : public QObject
 
 public:
     /**
-     * @brief Get the connection for this PendingConnection.
+     * \brief Get the connection for this PendingConnection.
      *
-     * Only call this after PendingConnection::ready() has been emitted.
-     * Only call this once. The PendingConnection object is no longer in a valid state after.
+     * Only valid this after PendingConnection::ready() has been emitted.
+     * \return the connection, or nullptr if called before that.
      */
     Q_INVOKABLE Quotient::Connection *connection();
 
     [[nodiscard]] QString matrixId() const;
+    /*!
+     * The url to open in a browser in order to continue login.
+     * The client should open it automatically and/or present it for the user to open.
+     * @return the url to open in a browser
+     */
     [[nodiscard]] QUrl oidcLoginUrl() const;
+
     ~PendingConnection() override;
 
 Q_SIGNALS:

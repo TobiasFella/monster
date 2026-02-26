@@ -5,7 +5,7 @@
 
 #include "connection.h"
 // #include "eventhandler.h"
-#include "lib.rs.h"
+#include "ffi.rs.h"
 #include "neochatroomtype.h"
 #include "roomstream.h"
 #include "rust/cxx.h"

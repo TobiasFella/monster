@@ -2,39 +2,28 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 use chrono::prelude::{DateTime, Utc};
-use matrix_sdk::authentication::oauth::registration::{
-    ApplicationType, ClientMetadata, Localized, OAuthGrantType,
-};
-use matrix_sdk::authentication::oauth::{ClientId, ClientRegistrationData, OAuthSession, UrlOrQuery, UserSession};
-use matrix_sdk::reqwest::Url;
-use matrix_sdk::ruma::serde::Raw;
+use matrix_sdk::authentication::oauth::{ClientId, UserSession};
 use matrix_sdk::{
     authentication::matrix::MatrixSession,
-    media::MediaFormat,
     ruma::{
-        api::client::{error::StandardErrorBody, room::Visibility},
+        api::client::{room::Visibility},
         events::{
             room::message::{MessageType, RoomMessageEventContent, TextMessageEventContent},
             AnyMessageLikeEventContent,
         },
-        RoomId, UserId,
+        UserId,
     },
-    Client,
 };
 use matrix_sdk_ui::{
     eyeball_im::VectorDiff,
-    sync_service::SyncService,
     timeline::{
-        MsgLikeKind, TimelineBuilder, TimelineItemContent, TimelineItemKind, VirtualTimelineItem,
+        MsgLikeKind, TimelineItemContent, TimelineItemKind, VirtualTimelineItem,
     },
 };
 use std::sync::{Arc, RwLock};
 use matrix_sdk::ruma::exports::serde::{Deserialize, Serialize};
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::net::TcpSocket;
-use tokio::runtime::Runtime;
-use tokio_stream::StreamExt;
 
+use crate::connection::Connection;
 use crate::room::Room;
 use crate::roomlistitem::RoomListItem;
 use crate::tombstone::RoomTombstoneEventContent;
@@ -42,11 +31,9 @@ use crate::tombstone::RoomTombstoneEventContent;
 mod room;
 mod roomlistitem;
 mod tombstone;
+mod connection;
 
-struct Connection {
-    rt: Runtime,
-    client: Client,
-}
+mod ffi;
 
 #[derive(Serialize, Deserialize)]
 struct SessionData {
@@ -277,320 +264,7 @@ impl TimelineItem {
     }
 }
 
-impl Connection {
-    fn restore(secret: String) -> Box<Connection> {
-        let session_data: SessionData = serde_json::from_str(&secret).unwrap();
-        let rt = Runtime::new().expect("Failed to create runtime");
 
-        let matrix_id = if session_data.oidc.is_some() {
-            session_data.oidc.as_ref().unwrap().user_session.meta.user_id.clone()
-        } else {
-            session_data.native.as_ref().unwrap().meta.user_id.clone()
-        };
-
-        let client = rt.block_on(async {
-            Client::builder()
-                .server_name(matrix_id.server_name())
-                .sqlite_store(
-                    dirs::state_dir()
-                        .unwrap()
-                        .join("monster")
-                        .join(matrix_id.to_string()),
-                    None, /* TODO: passphrase */
-                )
-                .build()
-                .await
-                .unwrap()
-        });
-        let client_clone = client.clone();
-        rt.spawn(async move {
-            if session_data.oidc.is_some() {
-                let oidc = session_data.oidc.unwrap();
-                client_clone.restore_session(OAuthSession {
-                    client_id: oidc.client_id,
-                    user: oidc.user_session,
-                }).await.unwrap();
-            } else {
-                client_clone.restore_session(session_data.native.unwrap()).await.unwrap();
-            }
-            ffi::shim_connected(matrix_id.to_string());
-        });
-        Box::new(Connection { rt, client })
-    }
-
-    fn timeline_paginate_back(&self, timeline: &Timeline) {
-        let timeline = timeline.timeline.clone();
-        self.rt.spawn(async move {
-            timeline.write().await.paginate_backwards(20).await.unwrap();
-        });
-    }
-
-    fn session(&self) -> String {
-        use matrix_sdk::AuthSession;
-        let data = match self.client.session().unwrap() {
-            AuthSession::Matrix(session) => SessionData {
-                oidc: None,
-                native: Some(session),
-            },
-            AuthSession::OAuth(session) => SessionData {
-                oidc: Some(OidcSession {
-                    client_id: session.client_id,
-                    user_session: session.user,
-                }),
-                native: None,
-            },
-            _ => panic!("Unexpected auth session type"),
-        };
-        serde_json::to_string(&data).unwrap()
-    }
-
-    fn init(matrix_id: String, password: String) -> Box<Connection> {
-        let rt = Runtime::new().expect("Failed to create runtime");
-        let _ =
-            std::fs::remove_dir_all(dirs::state_dir().unwrap().join("monster").join(&matrix_id));
-        let client = rt.block_on(async {
-            let user_id = UserId::parse(&matrix_id).unwrap();
-            Client::builder()
-                .server_name(&user_id.server_name())
-                .sqlite_store(
-                    dirs::state_dir().unwrap().join("monster").join(&matrix_id),
-                    None, /* TODO: passphrase */
-                )
-                .build()
-                .await
-                .unwrap()
-        });
-        let client_clone = client.clone();
-        rt.spawn(async move {
-            let user_id = UserId::parse(&matrix_id).unwrap();
-            client_clone
-                .matrix_auth()
-                .login_username(user_id, &password)
-                .send()
-                .await
-                .unwrap();
-            ffi::shim_connected(matrix_id);
-        });
-        Box::new(Connection { rt, client })
-    }
-
-    pub(crate) fn init_oidc(server_name: String) -> Box<Connection> {
-        let rt = Runtime::new().expect("Failed to create runtime");
-        let client = rt.block_on(async {
-            Client::builder()
-                .server_name_or_homeserver_url(&server_name)
-                .build()
-                .await
-                .unwrap()
-        });
-        let client_clone = client.clone();
-        rt.spawn(async move {
-            let client = client_clone;
-            let mut client_metadata = ClientMetadata::new(
-                ApplicationType::Native,
-                vec![OAuthGrantType::AuthorizationCode {
-                    redirect_uris: vec![Url::parse("http://localhost").unwrap()],
-                }],
-                Localized::new(Url::parse("https://kde.org").unwrap(), None),
-            );
-            client_metadata.client_name = Some(Localized::new("Monster".to_string(), None));
-            let oauth = client.oauth();
-            let url = oauth
-                .login(
-                    Url::parse("http://localhost:18779").unwrap(),
-                    None,
-                    Some(ClientRegistrationData::new(
-                        Raw::new(&client_metadata).unwrap(),
-                    )),
-                    None,
-                )
-                .build()
-                .await
-                .unwrap()
-                .url
-                .to_string();
-
-            ffi::shim_oidc_login_url_available(server_name.clone(), url);
-
-            let socket = TcpSocket::new_v4().unwrap();
-            socket.bind("0.0.0.0:18779".parse().unwrap()).unwrap();
-
-            let (mut stream, _) = socket.listen(1).unwrap().accept().await.unwrap();
-            let mut data = String::new();
-
-            stream
-                .write_all("HTTP/1.0 200 OK\r\n\r\n".as_bytes())
-                .await
-                .unwrap();
-            BufReader::new(stream).read_line(&mut data).await.unwrap();
-            let query = &data.split(" ").nth(1).unwrap()[2..];
-            oauth
-                .finish_login(UrlOrQuery::Query(query.to_string()))
-                .await
-                .unwrap();
-            ffi::shim_connected(server_name);
-
-        });
-        Box::new(Connection { rt, client })
-    }
-
-    fn timeline(&self, room_id: String) -> Box<Timeline> {
-        let client = self.client.clone();
-        let matrix_id = client
-            .user_id()
-            .map(|it| it.to_string())
-            .unwrap_or("".to_string());
-        let room_id = RoomId::parse(room_id).unwrap();
-        let room = client.get_room(&room_id).unwrap();
-        let (timeline, items, stream) = self.rt.block_on(async move {
-            let timeline = TimelineBuilder::new(&room).build().await.unwrap();
-            let (items, stream) = timeline.subscribe().await;
-            (timeline, items, stream)
-        });
-
-        let timeline = Box::new(Timeline {
-            queue: Arc::new(RwLock::new(vec![])),
-            timeline: Arc::new(tokio::sync::RwLock::new(timeline)),
-        });
-        let queue = timeline.queue.clone();
-        self.rt.spawn(async move {
-            tokio::pin!(stream);
-
-            let mxid = matrix_id.clone();
-
-            queue
-                .write()
-                .unwrap()
-                .push(VectorDiff::Append { values: items });
-            ffi::shim_timeline_changed(mxid, room_id.to_string());
-
-            loop {
-                let matrix_id = matrix_id.clone();
-                let room_id = room_id.to_string();
-                let Some(entries) = stream.next().await else {
-                    continue; //TODO or return?
-                };
-
-                for entry in entries {
-                    queue.write().unwrap().push(entry);
-                }
-                ffi::shim_timeline_changed(matrix_id, room_id);
-            }
-        });
-        timeline
-    }
-
-    fn room_avatar(&self, room_id: String) {
-        let client = self.rt.block_on(async { self.client.clone() });
-        self.rt.spawn(async move {
-            let room_id = RoomId::parse(room_id).unwrap();
-            let data = client
-                .get_room(&room_id)
-                .unwrap()
-                .avatar(MediaFormat::File)
-                .await
-                .unwrap()
-                .unwrap_or("".into());
-            ffi::shim_avatar_loaded(room_id.to_string(), data);
-        });
-    }
-
-    fn device_id(&self) -> String {
-        self.client.device_id().unwrap().to_string()
-    }
-
-    fn matrix_id(&self) -> String {
-        self.client.user_id().unwrap().to_string()
-    }
-
-    fn slide(&self) -> Box<Rooms> {
-        let client = self.client.clone();
-
-        let rooms = Box::new(Rooms {
-            queue: Arc::new(RwLock::new(vec![])),
-        });
-        let rooms_clone = rooms.queue.clone();
-        self.rt.spawn(async move {
-            let rooms = rooms_clone;
-            let matrix_id = client
-                .user_id()
-                .map(|it| it.to_string())
-                .unwrap_or("".to_string());
-            let sync_service = SyncService::builder(client).build().await.unwrap();
-            let service = sync_service.room_list_service();
-            sync_service.start().await;
-            let room_list = service.all_rooms().await.unwrap();
-            let (stream, controller) = room_list.entries_with_dynamic_adapters(10000);
-            use tokio::pin;
-            pin!(stream);
-            controller.set_filter(Box::new(|_| true));
-            loop {
-                let m = matrix_id.clone();
-                for entry in stream.next().await.unwrap() {
-                    rooms.write().unwrap().push(entry);
-                    ffi::shim_rooms_changed(m.clone());
-                }
-            }
-        });
-        rooms
-    }
-
-    fn logout(&self) {
-        let client = self.client.clone();
-        self.rt.spawn(async move {
-            let result = client.matrix_auth().logout().await;
-            use http::status::StatusCode;
-            use matrix_sdk::ruma::api::client::error::{ErrorBody, ErrorKind};
-            use matrix_sdk::ruma::api::client::Error;
-            use matrix_sdk::ruma::api::error::FromHttpResponseError::Server;
-            use matrix_sdk::HttpError::Api;
-            use matrix_sdk::RumaApiError::ClientApi;
-            match result {
-                Err(Api(error)) => match error.as_ref() {
-                    Server(ClientApi(Error {
-                        status_code: StatusCode::UNAUTHORIZED,
-                        body:
-                            ErrorBody::Standard(StandardErrorBody {
-                                kind: ErrorKind::UnknownToken { .. },
-                                ..
-                            }),
-                        ..
-                    })) => {
-                        ffi::shim_logged_out(client.user_id().unwrap().to_string());
-                    }
-                    _ => {}
-                },
-                Ok(..) => {
-                    ffi::shim_logged_out(client.user_id().unwrap().to_string());
-                }
-                x => eprintln!("Error logging out: {:?}", x),
-            }
-        });
-    }
-
-    fn create_room(&self, room_create_options: &RoomCreateOptions) {
-        let client = self.client.clone();
-        let options = room_create_options.0.clone();
-        self.rt.spawn(async move {
-            client.create_room(options).await.unwrap();
-        });
-    }
-
-    fn room(&self, id: String) -> Box<Room> {
-        println!("Looking up room {}", id);
-        // TODO: This seems to sometimes return None even when we are joined to the room; figure out why
-        // Leads to a crash on startup, probably the initial sync isn't completed yet?
-        let room_id = RoomId::parse(id).unwrap();
-        Box::new(Room {
-            room: self.client.get_room(&room_id).unwrap(),
-        })
-    }
-
-    fn is_known_room(&self, id: String) -> bool {
-        let room_id = RoomId::parse(id).unwrap();
-        self.client.get_room(&room_id).is_some()
-    }
-}
 
 #[derive(Clone)]
 struct RoomCreateOptions(matrix_sdk::ruma::api::client::room::create_room::v3::Request);
@@ -643,109 +317,4 @@ fn init_oidc(server_name: String) -> Box<Connection> {
 
 fn restore(secret: String) -> Box<Connection> {
     Connection::restore(secret)
-}
-
-// NOTE: When adding functions here, delete the entire build folder. There's probably something missing somewhere to make the header regenerate automatically
-#[cxx::bridge]
-mod ffi {
-    #[namespace = "sdk"]
-    extern "Rust" {
-        type RoomTombstoneEventContent;
-        type Connection;
-        type RoomListItem;
-        type TimelineItem;
-        type Rooms;
-        type Timeline;
-        type VecDiff;
-        type RoomListVecDiff;
-        type RoomCreateOptions;
-        type Room;
-
-        pub fn body(self: &RoomTombstoneEventContent) -> String;
-        pub fn replacement_room(self: &RoomTombstoneEventContent) -> String;
-
-        fn init(matrix_id: String, password: String) -> Box<Connection>;
-        fn init_oidc(server_name: String) -> Box<Connection>;
-        fn restore(secret: String) -> Box<Connection>;
-        fn device_id(self: &Connection) -> String;
-        fn matrix_id(self: &Connection) -> String;
-        fn slide(self: &Connection) -> Box<Rooms>;
-        fn room_avatar(self: &Connection, room_id: String);
-        fn timeline(self: &Connection, room_id: String) -> Box<Timeline>;
-        fn session(self: &Connection) -> String;
-        fn timeline_paginate_back(self: &Connection, timeline: &Timeline);
-        fn logout(self: &Connection);
-        fn create_room(self: &Connection, room_create_options: &RoomCreateOptions);
-        fn room(self: &Connection, id: String) -> Box<Room>;
-        fn is_known_room(self: &Connection, id: String) -> bool;
-
-        fn id(self: &TimelineItem) -> String;
-        fn body(self: &TimelineItem) -> String;
-        fn box_me(self: &TimelineItem) -> Box<TimelineItem>;
-        fn timestamp(self: &TimelineItem) -> String;
-
-        fn queue_next(self: &Timeline) -> Box<VecDiff>;
-        fn has_queued_item(self: &Timeline) -> bool;
-        fn send_message(self: &Timeline, connection: &Connection, message: String);
-
-        fn queue_next(self: &Rooms) -> Box<RoomListVecDiff>;
-        fn has_queued_item(self: &Rooms) -> bool;
-
-        fn op(self: &VecDiff) -> u8;
-        fn index(self: &VecDiff) -> usize;
-        fn item(self: &VecDiff) -> Box<TimelineItem>;
-        fn items_vec(self: &VecDiff) -> Vec<TimelineItem>;
-
-        fn op(self: &RoomListVecDiff) -> u8;
-        fn index(self: &RoomListVecDiff) -> usize;
-        fn item(self: &RoomListVecDiff) -> Box<RoomListItem>;
-        fn items_vec(self: &RoomListVecDiff) -> Vec<RoomListItem>;
-
-        fn room_create_options_new() -> Box<RoomCreateOptions>;
-        fn set_invite(self: &mut RoomCreateOptions, users: Vec<String>);
-        fn set_name(self: &mut RoomCreateOptions, name: String);
-        fn set_room_alias(self: &mut RoomCreateOptions, alias: String);
-        fn set_topic(self: &mut RoomCreateOptions, topic: String);
-        fn set_visibility_public(self: &mut RoomCreateOptions, visibility_public: bool);
-
-        fn id(self: &Room) -> String;
-        fn state(self: &Room) -> u8;
-        fn is_space(self: &Room) -> bool;
-        fn room_type(self: &Room) -> String;
-        fn display_name(self: &Room) -> String;
-        fn is_tombstoned(self: &Room) -> bool;
-        fn tombstone(self: &Room) -> Box<RoomTombstoneEventContent>;
-        fn topic(self: &Room) -> String;
-        fn num_unread_messages(self: &Room) -> u64;
-        fn num_unread_mentions(self: &Room) -> u64;
-        fn is_favourite(self: &Room) -> bool;
-        fn is_low_priority(self: &Room) -> bool;
-
-        fn id(self: &RoomListItem) -> String;
-        fn state(self: &RoomListItem) -> u8;
-        fn is_space(self: &RoomListItem) -> bool;
-        fn room_type(self: &RoomListItem) -> String;
-        fn display_name(self: &RoomListItem) -> String;
-        fn is_tombstoned(self: &RoomListItem) -> bool;
-        fn tombstone(self: &RoomListItem) -> Box<RoomTombstoneEventContent>;
-        fn topic(self: &RoomListItem) -> String;
-        fn num_unread_messages(self: &RoomListItem) -> u64;
-        fn num_unread_mentions(self: &RoomListItem) -> u64;
-        fn canonical_alias(self: &RoomListItem) -> String;
-        fn is_favourite(self: &RoomListItem) -> bool;
-        fn is_low_priority(self: &RoomListItem) -> bool;
-        fn box_me(self: &RoomListItem) -> Box<RoomListItem>;
-    }
-
-    unsafe extern "C++" {
-        include!("sdk/include/callbacks.h");
-
-        fn shim_connected(matrix_id: String);
-        fn shim_rooms_changed(matrix_id: String);
-        fn shim_timeline_changed(matrix_id: String, room_id: String);
-        fn shim_avatar_loaded(room_id: String, data: Vec<u8>);
-        fn shim_logged_out(matrix_id: String);
-
-        fn shim_oidc_login_url_available(server_name: String, url: String);
-    }
 }

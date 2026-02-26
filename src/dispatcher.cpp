@@ -36,6 +36,11 @@ void shim_oidc_login_url_available(rust::String serverName, rust::String url)
     Q_EMIT Dispatcher::instance()->oidcLoginUrlAvailable(stringFromRust(serverName), stringFromRust(url));
 }
 
+void task_done(rust::String token)
+{
+    Q_EMIT Dispatcher::instance()->taskDone(stringFromRust(token));
+}
+
 Dispatcher::Dispatcher()
     : QObject(nullptr)
 {

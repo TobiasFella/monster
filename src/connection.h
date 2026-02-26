@@ -7,8 +7,9 @@
 #include <QQmlEngine>
 #include <qqmlintegration.h>
 
-#include "lib.rs.h"
+#include "ffi.rs.h"
 #include "room.h"
+#include "sdk/src/task.h"
 
 namespace Quotient
 {
@@ -20,11 +21,13 @@ class Connection : public QObject
     QML_ELEMENT
     QML_UNCREATABLE("")
 
-public:
-    ~Connection();
+    Q_PROPERTY(QString matrixId READ matrixId CONSTANT)
 
-    rust::Box<sdk::Connection> &connection() const;
-    QString matrixId() const;
+public:
+    ~Connection() override;
+
+    [[nodiscard]] rust::Box<sdk::Connection> &connection() const;
+    [[nodiscard]] QString matrixId() const;
 
     Q_INVOKABLE void open(const QString &roomId);
     Q_INVOKABLE void logout();
@@ -33,6 +36,8 @@ public:
 
     Q_INVOKABLE Quotient::Room *room(const QString &id);
     Q_INVOKABLE bool hasRoom(const QString &id);
+
+    Q_INVOKABLE Task *setDisplayName(const QString &displayName);
 
     /*
      * @brief Get a room stream for the connection.
@@ -43,7 +48,7 @@ public:
 
 Q_SIGNALS:
     void avatarLoaded(const QString &roomId, const QByteArray &data);
-    void openRoom(Room *room);
+    void openRoom(Quotient::Room *room);
     void loggedOut();
 
 private:
@@ -51,10 +56,7 @@ private:
     std::unique_ptr<Private> d;
     friend class PendingConnection;
 
-    Connection(std::optional<rust::Box<sdk::Connection>> wrapper);
-
-    static Connection *loginWithPassword(const QString &matrixId, const QString &password);
-    static Connection *loadAccount(const QString &matrixId);
+    explicit Connection(std::optional<rust::Box<sdk::Connection>> wrapper);
 };
 
 }

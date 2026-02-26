@@ -17,6 +17,8 @@ add_executable(monster
     roomtreemodel.cpp
     sortfilterroomtreemodel.cpp
     roomsortparameter.cpp
+    sdk/src/task.cpp
+    sdk/src/task.h
 )
 
 ecm_add_qml_module(monster URI im.arctic.monster GENERATE_PLUGIN_SOURCE

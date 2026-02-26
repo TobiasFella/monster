@@ -4,7 +4,7 @@
 #include "roomsmodel.h"
 
 #include "connection.h"
-#include "lib.rs.h"
+#include "ffi.rs.h"
 #include "roomstream.h"
 #include "utils.h"
 

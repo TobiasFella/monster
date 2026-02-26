@@ -8,7 +8,7 @@
 
 #include <KLocalizedString>
 
-#include "lib.rs.h"
+#include "ffi.rs.h"
 #include "rust/cxx.h"
 
 class Room;

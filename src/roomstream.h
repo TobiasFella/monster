@@ -5,7 +5,7 @@
 
 #include <QObject>
 
-#include "lib.rs.h"
+#include "ffi.rs.h"
 
 namespace Quotient {
     class Connection;

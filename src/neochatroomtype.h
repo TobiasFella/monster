@@ -8,7 +8,7 @@
 
 #include <KLocalizedString>
 
-#include "lib.rs.h"
+#include "ffi.rs.h"
 
 using namespace Qt::StringLiterals;
 

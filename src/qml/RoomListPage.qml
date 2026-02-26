@@ -29,8 +29,36 @@ Kirigami.ScrollablePage {
         Kirigami.Action {
             text: i18nc("@action:button", "Create Room")
             onTriggered: root.connection.createRoom("Hello", "World", "")
+        },
+        Kirigami.Action {
+            text: i18nc("@action:button", "Set Display Name")
+            onTriggered: displayNameDialog.createObject(root).open()
         }
     ]
+
+    Component {
+        id: displayNameDialog
+        Kirigami.Dialog {
+            title: i18nc("@title:dialog", "Set Display Name")
+            contentItem: ColumnLayout {
+                FormCard.FormTextFieldDelegate {
+                    id: displayNameField
+                    label: i18nc("@label", "Display Name")
+                }
+                FormCard.FormButtonDelegate {
+                    id: setDisplayNameButton
+                    text: i18nc("@action:button", "Set Display Name")
+                    onClicked: {
+                        let task = root.connection.setDisplayName(displayNameField.text)
+                        task.done.connect(() => {
+                            setDisplayNameButton.enabled = true
+                        });
+                        setDisplayNameButton.enabled = false
+                    }
+                }
+            }
+        }
+    }
 
     Connections {
         target: root.connection
@@ -42,7 +70,7 @@ Kirigami.ScrollablePage {
         }
     }
 
-    TreeView {
+/*    TreeView {
         id: treeView
         topMargin: Math.round(Kirigami.Units.smallSpacing / 2)
 
@@ -101,5 +129,5 @@ Kirigami.ScrollablePage {
                 }
             }
         }
-    }
+    }*/
 }

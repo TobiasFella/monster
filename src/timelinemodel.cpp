@@ -4,7 +4,7 @@
 #include "timelinemodel.h"
 
 #include "dispatcher.h"
-#include "lib.rs.h"
+#include "ffi.rs.h"
 #include "utils.h"
 
 #include "connection.h"
