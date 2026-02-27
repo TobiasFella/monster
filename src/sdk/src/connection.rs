@@ -38,16 +38,19 @@ impl Connection {
             session_data.native.as_ref().unwrap().meta.user_id.clone()
         };
 
+        let state_dir = dirs::state_dir()
+            .unwrap()
+            .join("monster")
+            .join(matrix_id.to_string());
+        println!("State dir: {:?}", state_dir);
         let client = rt.block_on(async {
             Client::builder()
                 .server_name(matrix_id.server_name())
                 .sqlite_store(
-                    dirs::state_dir()
-                        .unwrap()
-                        .join("monster")
-                        .join(matrix_id.to_string()),
+                    state_dir,
                     None, /* TODO: passphrase */
                 )
+                .handle_refresh_tokens()
                 .build()
                 .await
                 .unwrap()
@@ -106,6 +109,7 @@ impl Connection {
                     dirs::state_dir().unwrap().join("monster").join(&matrix_id),
                     None, /* TODO: passphrase */
                 )
+                .handle_refresh_tokens()
                 .build()
                 .await
                 .unwrap()
@@ -129,6 +133,7 @@ impl Connection {
         let client = rt.block_on(async {
             Client::builder()
                 .server_name_or_homeserver_url(&server_name)
+                .handle_refresh_tokens()
                 .build()
                 .await
                 .unwrap()

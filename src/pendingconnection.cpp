@@ -101,15 +101,6 @@ PendingConnection *PendingConnection::loginWithOidc(const QString &serverName, A
 
 Connection *PendingConnection::connection()
 {
-    if (!m_ready) {
-        return {};
-    }
-
-    if (!m_connection) {
-        m_connection = new Connection(std::move(m_rawConnection));
-        m_rawConnection = std::nullopt;
-    }
-
     return m_connection;
 }
 
@@ -127,6 +118,9 @@ void PendingConnection::initialize(ConnectionType type)
 {
     m_accounts->accountLoaded(this);
 
+    m_connection = new Connection(std::move(m_rawConnection));
+    m_rawConnection = std::nullopt;
+
     connect(connection(), &Connection::loggedOut, connection(), [this] {
         m_accounts->accountLoggedOut(matrixId());
         auto job = new QKeychain::DeletePasswordJob(qAppName());
@@ -143,7 +137,7 @@ void PendingConnection::initialize(ConnectionType type)
     if (type == ConnectionType::New) {
         const auto job = new QKeychain::WritePasswordJob(qAppName());
         job->setKey(matrixId());
-        job->setBinaryData(bytesFromRust((*m_rawConnection)->session()));
+        job->setBinaryData(bytesFromRust((connection()->connection())->session()));
         job->setAutoDelete(true);
         job->start();
 
