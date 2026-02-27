@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Tobias Fella <tobias.fella@kde.org>
 // SPDX-License-Identifier: LGPL-2.0-or-later
 
+use std::collections::HashMap;
+use std::path::PathBuf;
 use matrix_sdk::authentication::oauth::{ClientRegistrationData, OAuthSession, UrlOrQuery};
 use matrix_sdk::Client;
 use matrix_sdk::media::MediaFormat;
@@ -16,7 +18,7 @@ use matrix_sdk::reqwest::Url;
 use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk_ui::sync_service::SyncService;
 use matrix_sdk_ui::timeline::TimelineBuilder;
-use rand::distributions::{Alphanumeric, DistString};
+use rand::distributions::Alphanumeric;
 use rand::Rng;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpSocket;
@@ -27,28 +29,82 @@ pub(crate) struct Connection {
     pub client: Client,
 }
 
+fn sqlite_passphrase<'a>() -> Option<&'a str> {
+    None //TODO
+}
+
+fn token() -> String {
+    rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(16)
+        .map(char::from)
+        .collect()
+}
+
+fn state_parent() -> PathBuf {
+    dirs::state_dir()
+        .unwrap()
+        .join("Arctic")
+        .join("monster")
+}
+
+fn state_dir(matrix_id: &String) -> PathBuf {
+    state_parent()
+        .join(matrix_id)
+}
+
+fn needs_resolving(matrix_id: String) -> Option<String> {
+    let file = state_parent().join("unresolved.json");
+    if !std::fs::exists(&file).unwrap() {
+        None
+    } else {
+        serde_json::from_str::<HashMap<String, String>>(&std::fs::read_to_string(file).unwrap()).unwrap().get(&matrix_id).map(|it| it.to_string())
+    }
+}
+
+fn remove_from_unresolved(matrix_id: String) {
+    let file = state_parent().join("unresolved.json");
+    let mut unresolved = serde_json::from_str::<HashMap<String, String>>(&std::fs::read_to_string(&file).unwrap()).unwrap();
+    unresolved.remove(&matrix_id);
+    std::fs::write(file, serde_json::to_string(&unresolved).unwrap()).unwrap();
+}
+
+fn add_to_unresolved(matrix_id: String, token: String) {
+    let file = state_parent().join("unresolved.json");
+    std::fs::create_dir_all(state_parent()).unwrap();
+    let mut unresolved: HashMap<String, String> = if let Ok(data) = std::fs::read_to_string(&file) {
+        serde_json::from_str::<HashMap<String, String>>(&data).unwrap_or_default()
+    } else {
+        Default::default()
+    };
+    unresolved.insert(matrix_id, token);
+    std::fs::write(file, serde_json::to_string(&unresolved).unwrap()).unwrap();
+}
+
 impl Connection {
     pub(crate) fn restore(secret: String) -> Box<Connection> {
         let session_data: SessionData = serde_json::from_str(&secret).unwrap();
         let rt = Runtime::new().expect("Failed to create runtime");
 
         let matrix_id = if session_data.oidc.is_some() {
-            session_data.oidc.as_ref().unwrap().user_session.meta.user_id.clone()
+            let data = session_data.oidc.as_ref().unwrap();
+            let matrix_id = data.user_session.meta.user_id.clone();
+
+            if let Some(token) = needs_resolving(matrix_id.to_string()) {
+                std::fs::rename(state_dir(&token), state_dir(&matrix_id.to_string())).unwrap();
+                remove_from_unresolved(matrix_id.to_string());
+            }
+            matrix_id
         } else {
             session_data.native.as_ref().unwrap().meta.user_id.clone()
         };
 
-        let state_dir = dirs::state_dir()
-            .unwrap()
-            .join("monster")
-            .join(matrix_id.to_string());
-        println!("State dir: {:?}", state_dir);
         let client = rt.block_on(async {
             Client::builder()
                 .server_name(matrix_id.server_name())
                 .sqlite_store(
-                    state_dir,
-                    None, /* TODO: passphrase */
+                    state_dir(&matrix_id.to_string()),
+                    sqlite_passphrase(),
                 )
                 .handle_refresh_tokens()
                 .build()
@@ -100,14 +156,14 @@ impl Connection {
     pub(crate) fn init(matrix_id: String, password: String) -> Box<Connection> {
         let rt = Runtime::new().expect("Failed to create runtime");
         let _ =
-            std::fs::remove_dir_all(dirs::state_dir().unwrap().join("monster").join(&matrix_id));
+            std::fs::remove_dir_all(state_dir(&matrix_id));
         let client = rt.block_on(async {
             let user_id = UserId::parse(&matrix_id).unwrap();
             Client::builder()
                 .server_name(&user_id.server_name())
                 .sqlite_store(
-                    dirs::state_dir().unwrap().join("monster").join(&matrix_id),
-                    None, /* TODO: passphrase */
+                    state_dir(&matrix_id),
+                    sqlite_passphrase(),
                 )
                 .handle_refresh_tokens()
                 .build()
@@ -129,10 +185,13 @@ impl Connection {
     }
 
     pub(crate) fn init_oidc(server_name: String) -> Box<Connection> {
+        let token = token();
+
         let rt = Runtime::new().expect("Failed to create runtime");
         let client = rt.block_on(async {
             Client::builder()
                 .server_name_or_homeserver_url(&server_name)
+                .sqlite_store(state_dir(&token), sqlite_passphrase())
                 .handle_refresh_tokens()
                 .build()
                 .await
@@ -183,8 +242,8 @@ impl Connection {
                 .finish_login(UrlOrQuery::Query(query.to_string()))
                 .await
                 .unwrap();
+            add_to_unresolved(client.user_id().unwrap().to_string(), token);
             ffi::shim_connected(server_name);
-
         });
         Box::new(Connection { rt, client })
     }
@@ -260,6 +319,18 @@ impl Connection {
 
     pub(crate) fn slide(&self) -> Box<Rooms> {
         let client = self.client.clone();
+
+        let clone = client.clone();
+        self.rt.spawn(async move {
+            let client = clone;
+            let mut devices = client.encryption().devices_stream().await.unwrap();
+            use tokio::pin;
+            pin!(devices);
+
+            for entry in devices.next().await {
+                println!("{:?}", entry);
+            }
+        });
 
         let rooms = Box::new(Rooms {
             queue: Arc::new(RwLock::new(vec![])),
@@ -347,11 +418,7 @@ impl Connection {
     }
 
     pub(crate) fn set_display_name(&self, display_name: String) -> String {
-        let token: String = rand::thread_rng()
-            .sample_iter(&Alphanumeric)
-            .take(16)
-            .map(char::from)
-            .collect();
+        let token = token();
         let client = self.client.clone();
         let token_clone = token.clone();
         self.rt.spawn(async move {
